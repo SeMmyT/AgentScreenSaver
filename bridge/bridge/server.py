@@ -16,6 +16,7 @@ from typing import Any
 from aiohttp import web
 from aiohttp_sse import sse_response
 
+from bridge.mdns import register_service, unregister_service
 from bridge.models import HookEvent, StatusUpdate
 
 logger = logging.getLogger(__name__)
@@ -99,6 +100,31 @@ async def status_handler(request: web.Request) -> web.Response:
     return web.json_response(data)
 
 
+async def on_startup_mdns(app: web.Application) -> None:
+    """Register mDNS service on startup (non-fatal if fails)."""
+    try:
+        zc, info = register_service(
+            port=app["port"], instance_name=app["instance_name"]
+        )
+        app["mdns_zc"] = zc
+        app["mdns_info"] = info
+    except (ValueError, OSError) as exc:
+        logger.warning("mDNS registration failed (non-fatal): %s", exc)
+        app["mdns_zc"] = None
+        app["mdns_info"] = None
+
+
+async def on_shutdown_mdns(app: web.Application) -> None:
+    """Unregister mDNS service on shutdown."""
+    zc = app.get("mdns_zc")
+    info = app.get("mdns_info")
+    if zc is not None and info is not None:
+        try:
+            unregister_service(zc, info)
+        except OSError as exc:
+            logger.warning("mDNS unregistration failed: %s", exc)
+
+
 def create_app(instance_name: str = "default", port: int = 4001) -> web.Application:
     """Create and configure the aiohttp application."""
     app = web.Application()
@@ -111,6 +137,9 @@ def create_app(instance_name: str = "default", port: int = 4001) -> web.Applicat
     app.router.add_post("/event", event_handler)
     app.router.add_get("/events", sse_handler)
     app.router.add_get("/status", status_handler)
+
+    app.on_startup.append(on_startup_mdns)
+    app.on_shutdown.append(on_shutdown_mdns)
 
     return app
 
