@@ -30,6 +30,14 @@ class SseClient {
         disconnect()
         _connectionState.value = ConnectionState.CONNECTING
 
+        try {
+            connectInternal(url)
+        } catch (e: Exception) {
+            _connectionState.value = ConnectionState.ERROR
+        }
+    }
+
+    private fun connectInternal(url: String) {
         val handler = object : BackgroundEventHandler {
             override fun onOpen() {
                 _connectionState.value = ConnectionState.CONNECTED
