@@ -1,14 +1,16 @@
 package com.claudescreensaver.data.network
 
 import com.claudescreensaver.data.models.AgentStatus
-import com.launchdarkly.eventsource.EventHandler
+import com.launchdarkly.eventsource.ConnectStrategy
 import com.launchdarkly.eventsource.EventSource
 import com.launchdarkly.eventsource.MessageEvent
+import com.launchdarkly.eventsource.background.BackgroundEventHandler
+import com.launchdarkly.eventsource.background.BackgroundEventSource
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.net.URI
-import java.time.Duration
+import java.util.concurrent.TimeUnit
 
 enum class ConnectionState {
     DISCONNECTED, CONNECTING, CONNECTED, ERROR
@@ -22,13 +24,13 @@ class SseClient {
     private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
-    private var eventSource: EventSource? = null
+    private var eventSource: BackgroundEventSource? = null
 
     fun connect(url: String) {
         disconnect()
         _connectionState.value = ConnectionState.CONNECTING
 
-        val handler = object : EventHandler {
+        val handler = object : BackgroundEventHandler {
             override fun onOpen() {
                 _connectionState.value = ConnectionState.CONNECTED
             }
@@ -53,9 +55,13 @@ class SseClient {
             override fun onComment(comment: String) {}
         }
 
-        eventSource = EventSource.Builder(handler, URI.create(url))
-            .reconnectTime(Duration.ofSeconds(2))
-            .build()
+        val connectStrategy = ConnectStrategy.http(URI.create(url))
+
+        eventSource = BackgroundEventSource.Builder(
+            handler,
+            EventSource.Builder(connectStrategy)
+                .retryDelay(2, TimeUnit.SECONDS)
+        ).build()
         eventSource?.start()
     }
 
