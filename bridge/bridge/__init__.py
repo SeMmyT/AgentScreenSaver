@@ -1,0 +1,1 @@
+"""Claude ScreenSaver bridge server."""
