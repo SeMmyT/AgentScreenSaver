@@ -10,16 +10,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.claudescreensaver.data.BillingManager
+import com.claudescreensaver.data.ProStatus
 import com.claudescreensaver.data.SoundManager
 import com.claudescreensaver.data.network.BridgeDiscovery
 import com.claudescreensaver.data.network.ConnectionState
 import com.claudescreensaver.data.network.SseClient
+import com.claudescreensaver.ui.screens.PaywallScreen
 import com.claudescreensaver.ui.screens.SettingsScreen
 import com.claudescreensaver.ui.screens.StatusDashboardScreen
 import com.claudescreensaver.ui.theme.ClaudeAccent
 import com.claudescreensaver.ui.theme.ClaudeScreenSaverTheme
 import com.claudescreensaver.viewmodel.StatusViewModel
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -27,6 +29,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var bridgeDiscovery: BridgeDiscovery
     private lateinit var viewModel: StatusViewModel
     private lateinit var soundManager: SoundManager
+    private lateinit var billingManager: BillingManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,6 +38,8 @@ class MainActivity : ComponentActivity() {
         bridgeDiscovery = BridgeDiscovery(this)
         viewModel = StatusViewModel(SseClient())
         soundManager = SoundManager(this)
+        billingManager = BillingManager(this)
+        billingManager.initialize()
 
         // Autoconnect: if we have a saved URL, connect immediately
         val prefs = getSharedPreferences("claude_screensaver", Context.MODE_PRIVATE)
@@ -45,10 +50,21 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             ClaudeScreenSaverTheme {
-                var showPreview by remember { mutableStateOf(false) }
                 val uiState by viewModel.uiState.collectAsState()
                 val servers by bridgeDiscovery.servers.collectAsState()
+                val proStatus by billingManager.proStatus.collectAsState()
+                val billingProducts by billingManager.products.collectAsState()
                 val scope = rememberCoroutineScope()
+
+                // Screen navigation state
+                var currentScreen by remember { mutableStateOf("settings") }
+
+                val isPro = proStatus == ProStatus.PRO || proStatus == ProStatus.TRIAL
+
+                // Gate sounds: disabled when FREE
+                LaunchedEffect(isPro) {
+                    soundManager.setEnabled(isPro)
+                }
 
                 // Play sounds on state changes
                 LaunchedEffect(uiState.agentStatus.state) {
@@ -68,29 +84,61 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                if (showPreview) {
-                    StatusDashboardScreen(
-                        uiState = uiState,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    Column {
-                        SettingsScreen(
+                when (currentScreen) {
+                    "dashboard" -> {
+                        StatusDashboardScreen(
                             uiState = uiState,
-                            discoveredServers = servers,
-                            onConnect = { url -> viewModel.connect(url) },
-                            onDisconnect = { viewModel.disconnect() },
-                            modifier = Modifier.weight(1f),
+                            isPro = isPro,
+                            modifier = Modifier.fillMaxSize(),
                         )
-                        Button(
-                            onClick = { showPreview = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = ClaudeAccent),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                        ) {
-                            Text("Preview ScreenSaver")
+                    }
+                    "paywall" -> {
+                        PaywallScreen(
+                            proStatus = proStatus,
+                            trialDaysRemaining = billingManager.trialDaysRemaining(),
+                            products = billingProducts,
+                            onPurchase = { product ->
+                                billingManager.launchPurchase(this@MainActivity, product)
+                            },
+                            onContinueFree = {
+                                // Go to dashboard with limited features
+                                currentScreen = "dashboard"
+                            },
+                        )
+                    }
+                    else -> {
+                        // Settings screen
+                        Column {
+                            SettingsScreen(
+                                uiState = uiState,
+                                discoveredServers = servers,
+                                onConnect = { url -> viewModel.connect(url) },
+                                onDisconnect = { viewModel.disconnect() },
+                                modifier = Modifier.weight(1f),
+                            )
+                            Button(
+                                onClick = {
+                                    if (isPro) {
+                                        currentScreen = "dashboard"
+                                    } else {
+                                        currentScreen = "paywall"
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = ClaudeAccent),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                            ) {
+                                Text("Preview ScreenSaver")
+                            }
                         }
+                    }
+                }
+
+                // If user purchases from paywall, auto-navigate to dashboard
+                LaunchedEffect(proStatus) {
+                    if (proStatus == ProStatus.PRO && currentScreen == "paywall") {
+                        currentScreen = "dashboard"
                     }
                 }
             }
@@ -109,6 +157,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         soundManager.release()
+        billingManager.destroy()
         super.onDestroy()
     }
 }

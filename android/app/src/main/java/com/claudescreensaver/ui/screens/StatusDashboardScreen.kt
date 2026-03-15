@@ -31,6 +31,7 @@ import kotlin.math.roundToInt
 @Composable
 fun StatusDashboardScreen(
     uiState: UiState,
+    isPro: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     // Burn-in prevention: Lissajous pixel shift
@@ -54,9 +55,10 @@ fun StatusDashboardScreen(
         label = "shiftY",
     )
 
+    val maxPanes = if (isPro) 4 else 1
     val activeSessions = uiState.sessions.values
         .sortedByDescending { it.timestamp }
-        .take(4)
+        .take(maxPanes)
 
     // Reorder state: maps slot index to session ID
     var slotOrder by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -91,30 +93,32 @@ fun StatusDashboardScreen(
                 .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
                 .padding(8.dp),
         ) {
-            // Top bar: Clawd + connection badge
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    ClawdMascot(
-                        state = uiState.agentStatus.state,
-                        modifier = Modifier.size(32.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "Agent Code",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onBackground,
+            // Top bar: Clawd + connection badge (hidden in free tier)
+            if (isPro) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ClawdMascot(
+                            state = uiState.agentStatus.state,
+                            modifier = Modifier.size(32.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "Agent Code",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
+                    }
+                    ConnectionBadge(
+                        state = uiState.connectionState,
+                        instanceName = uiState.agentStatus.instanceName,
                     )
                 }
-                ConnectionBadge(
-                    state = uiState.connectionState,
-                    instanceName = uiState.agentStatus.instanceName,
-                )
             }
 
             when {

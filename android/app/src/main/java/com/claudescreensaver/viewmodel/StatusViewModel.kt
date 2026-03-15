@@ -2,6 +2,7 @@ package com.claudescreensaver.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.claudescreensaver.data.ProStatus
 import com.claudescreensaver.data.models.AgentStatus
 import com.claudescreensaver.data.network.ConnectionState
 import com.claudescreensaver.data.network.SseClient
@@ -14,6 +15,7 @@ data class UiState(
     val agentStatus: AgentStatus = AgentStatus.DISCONNECTED,
     val sessions: Map<String, AgentStatus> = emptyMap(),
     val connectionState: ConnectionState = ConnectionState.DISCONNECTED,
+    val proStatus: ProStatus = ProStatus.FREE,
 )
 
 class StatusViewModel(
