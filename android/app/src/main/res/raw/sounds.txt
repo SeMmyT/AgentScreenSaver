@@ -1,0 +1,22 @@
+Place custom sound files here as .mp3 or .ogg:
+
+  sound_awaiting_input.mp3  — plays when Claude needs input
+                              (e.g., SC Probe "awaiting command",
+                               WC3 Peon "ready to work")
+
+  sound_complete.mp3        — plays when a session completes
+                              (e.g., WC3 Peasant "job's done",
+                               SC SCV "in the pipe, five by five")
+
+  sound_error.mp3           — plays when an error occurs
+                              (e.g., SC "not enough minerals",
+                               WC3 "more gold is required")
+
+Sound pack ideas:
+  - StarCraft Protoss: Probe responses
+  - WarCraft 3 Orc: Peon "ready to work", "work work"
+  - WarCraft 3 Human: Peasant "what is it?", "job's done"
+  - WarCraft 3 Night Elf: Wisp sounds
+  - WarCraft 3 Undead: Acolyte responses
+
+Falls back to system notification sound if no custom files are present.

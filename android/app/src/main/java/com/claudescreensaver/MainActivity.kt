@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.claudescreensaver.data.SoundManager
 import com.claudescreensaver.data.network.BridgeDiscovery
 import com.claudescreensaver.data.network.ConnectionState
 import com.claudescreensaver.data.network.SseClient
@@ -25,6 +26,7 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var bridgeDiscovery: BridgeDiscovery
     private lateinit var viewModel: StatusViewModel
+    private lateinit var soundManager: SoundManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,6 +34,7 @@ class MainActivity : ComponentActivity() {
 
         bridgeDiscovery = BridgeDiscovery(this)
         viewModel = StatusViewModel(SseClient())
+        soundManager = SoundManager(this)
 
         // Autoconnect: if we have a saved URL, connect immediately
         val prefs = getSharedPreferences("claude_screensaver", Context.MODE_PRIVATE)
@@ -46,6 +49,11 @@ class MainActivity : ComponentActivity() {
                 val uiState by viewModel.uiState.collectAsState()
                 val servers by bridgeDiscovery.servers.collectAsState()
                 val scope = rememberCoroutineScope()
+
+                // Play sounds on state changes
+                LaunchedEffect(uiState.agentStatus.state) {
+                    soundManager.onStateChange(uiState.agentStatus.state)
+                }
 
                 // Autoconnect from mDNS: if disconnected and no saved URL,
                 // connect to the first discovered server automatically
@@ -97,5 +105,10 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         bridgeDiscovery.stopDiscovery()
         super.onPause()
+    }
+
+    override fun onDestroy() {
+        soundManager.release()
+        super.onDestroy()
     }
 }
