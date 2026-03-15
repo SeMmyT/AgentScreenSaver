@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.stateIn
 
 data class UiState(
     val agentStatus: AgentStatus = AgentStatus.DISCONNECTED,
+    val sessions: Map<String, AgentStatus> = emptyMap(),
     val connectionState: ConnectionState = ConnectionState.DISCONNECTED,
 )
 
@@ -21,9 +22,10 @@ class StatusViewModel(
 
     val uiState: StateFlow<UiState> = combine(
         sseClient.status,
+        sseClient.sessions,
         sseClient.connectionState,
-    ) { status, conn ->
-        UiState(agentStatus = status, connectionState = conn)
+    ) { status, sessions, conn ->
+        UiState(agentStatus = status, sessions = sessions, connectionState = conn)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),

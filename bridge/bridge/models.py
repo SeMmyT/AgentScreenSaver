@@ -41,6 +41,7 @@ class HookEvent:
     agent_id: str | None = None
     agent_type: str | None = None
     stop_hook_active: bool = False
+    last_assistant_message: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> HookEvent:
@@ -54,6 +55,7 @@ class HookEvent:
             agent_id=data.get("agent_id"),
             agent_type=data.get("agent_type"),
             stop_hook_active=data.get("stop_hook_active", False),
+            last_assistant_message=data.get("last_assistant_message"),
         )
 
 
@@ -78,6 +80,11 @@ class StatusUpdate:
         requires_input = status == AgentState.AWAITING_INPUT
         tool_summary = _summarize_tool_input(event.tool_input) if event.tool_input else ""
 
+        # Prefer last_assistant_message for richer context
+        message = event.last_assistant_message or event.message or ""
+        if len(message) > 200:
+            message = message[:200]
+
         return cls(
             status=status,
             session_id=event.session_id,
@@ -85,7 +92,7 @@ class StatusUpdate:
             event=event.event_name,
             tool=event.tool_name,
             tool_input_summary=tool_summary,
-            message=event.message or "",
+            message=message,
             requires_input=requires_input,
             agent_id=event.agent_id,
             agent_type=event.agent_type,
