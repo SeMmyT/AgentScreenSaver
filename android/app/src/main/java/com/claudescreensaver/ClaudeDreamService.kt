@@ -1,6 +1,8 @@
 package com.claudescreensaver
 
 import android.content.Context
+import android.graphics.Color
+import android.view.WindowManager
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.claudescreensaver.data.network.SseClient
@@ -16,14 +18,27 @@ class ClaudeDreamService : DreamServiceCompat() {
         super.onAttachedToWindow()
         isInteractive = false
         isFullscreen = true
-        isScreenBright = false
+        isScreenBright = true  // Keep screen readable on charging stand
+
+        // Force opaque dark background on the dream window
+        window?.let { w ->
+            w.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.parseColor("#141413")))
+            w.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER.inv() and 0) // no-op but ensures no wallpaper
+        }
 
         viewModel = StatusViewModel(SseClient())
+
+        val prefs = getSharedPreferences("claude_screensaver", Context.MODE_PRIVATE)
 
         setContent {
             ClaudeScreenSaverTheme {
                 val uiState by viewModel.uiState.collectAsState()
-                StatusDashboardScreen(uiState = uiState)
+                val displayMode = prefs.getString("display_mode", "advanced") ?: "advanced"
+                StatusDashboardScreen(
+                    uiState = uiState,
+                    isPro = true,
+                    displayMode = displayMode,
+                )
             }
         }
     }

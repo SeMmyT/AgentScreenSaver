@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -136,11 +137,80 @@ fun SettingsScreen(
             }
         }
 
+        // Display mode toggle
+        Spacer(Modifier.height(24.dp))
+        var displayMode by remember {
+            mutableStateOf(prefs.getString("display_mode", "advanced") ?: "advanced")
+        }
+        Text(
+            text = "Display Mode",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            listOf("advanced" to "Advanced", "simple" to "Simple").forEach { (value, label) ->
+                FilterChip(
+                    selected = displayMode == value,
+                    onClick = {
+                        displayMode = value
+                        prefs.edit().putString("display_mode", value).apply()
+                    },
+                    label = { Text(label) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = ClaudeAccent,
+                        selectedLabelColor = ClaudeBgDark,
+                    ),
+                )
+            }
+        }
+        Text(
+            text = if (displayMode == "advanced") "4-pane terminal grid"
+                   else "Full-screen ASCII animations",
+            style = MaterialTheme.typography.labelSmall,
+            color = ClaudeGray,
+        )
+
+        // Kiosk mode toggle
+        Spacer(Modifier.height(24.dp))
+        var kioskMode by remember {
+            mutableStateOf(prefs.getBoolean("kiosk_mode", false))
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Kiosk Mode",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+                Text(
+                    text = "Show over lock screen while charging",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = ClaudeGray,
+                )
+            }
+            Switch(
+                checked = kioskMode,
+                onCheckedChange = { checked ->
+                    kioskMode = checked
+                    prefs.edit().putBoolean("kiosk_mode", checked).apply()
+                },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = ClaudeAccent,
+                    checkedTrackColor = ClaudeAccentDeep,
+                ),
+            )
+        }
+
         Spacer(Modifier.weight(1f))
 
-        // Hint about screensaver
         Text(
-            text = "Tip: Go to Settings > Display > Screen Saver to enable Agent Code Status as your screensaver.",
+            text = if (kioskMode) "Kiosk: app shows over lock screen when charging. Place on stand and it takes over."
+                   else "Tip: Enable Kiosk Mode above, or go to Settings > Display > Screen Saver.",
             style = MaterialTheme.typography.labelSmall,
             color = ClaudeGray,
         )

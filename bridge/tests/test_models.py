@@ -263,3 +263,142 @@ def test_summarize_tool_input_fallback():
     update = StatusUpdate.from_event(event, instance_name="dev")
     assert "some_key" in update.tool_input_summary
     assert "some_value" in update.tool_input_summary
+
+
+def test_user_prompt_submit_maps_to_thinking_with_message():
+    raw = {
+        "hook_event_name": "UserPromptSubmit",
+        "session_id": "s1",
+        "message": "check android",
+    }
+    event = HookEvent.from_dict(raw)
+    update = StatusUpdate.from_event(event, instance_name="test")
+    assert update.status == AgentState.THINKING
+    assert update.message == "check android"
+    assert update.user_message == "check android"
+
+
+def test_user_prompt_submit_empty_message():
+    raw = {
+        "hook_event_name": "UserPromptSubmit",
+        "session_id": "s1",
+        "message": "",
+    }
+    event = HookEvent.from_dict(raw)
+    update = StatusUpdate.from_event(event, instance_name="test")
+    assert update.status == AgentState.THINKING
+    assert update.user_message is None
+
+
+def test_stop_with_stop_hook_active_maps_to_interrupted():
+    raw = {
+        "hook_event_name": "Stop",
+        "session_id": "s1",
+        "stop_hook_active": True,
+    }
+    event = HookEvent.from_dict(raw)
+    update = StatusUpdate.from_event(event, instance_name="test")
+    assert update.status == AgentState.AWAITING_INPUT
+    assert update.interrupted is True
+    assert update.requires_input is True
+
+
+def test_stop_without_stop_hook_active_maps_to_complete():
+    raw = {
+        "hook_event_name": "Stop",
+        "session_id": "s1",
+        "stop_hook_active": False,
+    }
+    event = HookEvent.from_dict(raw)
+    update = StatusUpdate.from_event(event, instance_name="test")
+    assert update.status == AgentState.COMPLETE
+    assert update.interrupted is False
+
+
+def test_interrupted_cleared_by_subsequent_event():
+    """After an interrupt, the next non-Stop event clears interrupted."""
+    stop_raw = {
+        "hook_event_name": "Stop",
+        "session_id": "s1",
+        "stop_hook_active": True,
+    }
+    event = HookEvent.from_dict(stop_raw)
+    update = StatusUpdate.from_event(event, instance_name="test")
+    assert update.interrupted is True
+
+    # Next event should not be interrupted
+    next_raw = {
+        "hook_event_name": "PreToolUse",
+        "session_id": "s1",
+        "tool_name": "Bash",
+        "tool_input": {"command": "ls"},
+    }
+    event2 = HookEvent.from_dict(next_raw)
+    update2 = StatusUpdate.from_event(event2, instance_name="test")
+    assert update2.interrupted is False
+    assert update2.user_message is None
+
+
+def test_user_message_cleared_on_pretooluse():
+    """user_message only set for UserPromptSubmit, not other events."""
+    prompt_raw = {
+        "hook_event_name": "UserPromptSubmit",
+        "session_id": "s1",
+        "message": "fix the bug",
+    }
+    event = HookEvent.from_dict(prompt_raw)
+    update = StatusUpdate.from_event(event, instance_name="test")
+    assert update.user_message == "fix the bug"
+
+    # Next PreToolUse should not carry user_message
+    tool_raw = {
+        "hook_event_name": "PreToolUse",
+        "session_id": "s1",
+        "tool_name": "Edit",
+        "tool_input": {"file_path": "/tmp/x.py"},
+    }
+    event2 = HookEvent.from_dict(tool_raw)
+    update2 = StatusUpdate.from_event(event2, instance_name="test")
+    assert update2.user_message is None
+
+
+def test_serialization_includes_new_fields():
+    raw = {
+        "hook_event_name": "UserPromptSubmit",
+        "session_id": "s1",
+        "message": "hello",
+    }
+    event = HookEvent.from_dict(raw)
+    update = StatusUpdate.from_event(event, instance_name="test")
+    d = update.to_dict()
+    assert "user_message" in d
+    assert d["user_message"] == "hello"
+    assert "interrupted" in d
+    assert d["interrupted"] is False
+
+    import json
+    parsed = json.loads(update.to_json())
+    assert parsed["user_message"] == "hello"
+    assert parsed["interrupted"] is False
+
+
+def test_custom_frames_passed_through():
+    raw = {
+        "hook_event_name": "PreToolUse",
+        "session_id": "s1",
+        "tool_name": "Bash",
+        "tool_input": {"command": "ls"},
+        "custom_frames": ["frame1", "frame2", "frame3", "frame4"],
+        "custom_label": "Discombobulating...",
+    }
+    event = HookEvent.from_dict(raw)
+    assert event.custom_frames == ["frame1", "frame2", "frame3", "frame4"]
+    assert event.custom_label == "Discombobulating..."
+
+    update = StatusUpdate.from_event(event, instance_name="test")
+    assert update.custom_frames == ["frame1", "frame2", "frame3", "frame4"]
+    assert update.custom_label == "Discombobulating..."
+
+    d = update.to_dict()
+    assert d["custom_frames"] == ["frame1", "frame2", "frame3", "frame4"]
+    assert d["custom_label"] == "Discombobulating..."

@@ -283,3 +283,106 @@ async def test_multiple_subagents_tracked(client: TestClient) -> None:
     assert len(sub_agents) == 2
     agent_ids = {sa["agent_id"] for sa in sub_agents}
     assert agent_ids == {"agent-1", "agent-3"}
+
+
+@pytest.mark.asyncio
+async def test_subagents_scoped_per_session(client: TestClient) -> None:
+    """Sub-agents from one session don't appear in another session's status."""
+    await client.post("/event", json={
+        "hook_event_name": "SubagentStart",
+        "session_id": "sess-A",
+        "agent_id": "agent-a1",
+        "agent_type": "Explore",
+    })
+    await client.post("/event", json={
+        "hook_event_name": "SubagentStart",
+        "session_id": "sess-B",
+        "agent_id": "agent-b1",
+        "agent_type": "general-purpose",
+    })
+
+    resp = await client.get("/status")
+    data = await resp.json()
+
+    assert len(data["sess-A"]["sub_agents"]) == 1
+    assert data["sess-A"]["sub_agents"][0]["agent_id"] == "agent-a1"
+    assert len(data["sess-B"]["sub_agents"]) == 1
+    assert data["sess-B"]["sub_agents"][0]["agent_id"] == "agent-b1"
+
+
+@pytest.mark.asyncio
+async def test_user_prompt_submit_event(client: TestClient) -> None:
+    """POST UserPromptSubmit event, verify user_message in /status."""
+    await client.post("/event", json={
+        "hook_event_name": "UserPromptSubmit",
+        "session_id": "sess-prompt",
+        "message": "check android",
+    })
+
+    resp = await client.get("/status")
+    data = await resp.json()
+    assert data["sess-prompt"]["user_message"] == "check android"
+    assert data["sess-prompt"]["status"] == "thinking"
+
+
+@pytest.mark.asyncio
+async def test_interrupted_stop_event(client: TestClient) -> None:
+    """POST Stop with stop_hook_active=True, verify interrupted in /status."""
+    await client.post("/event", json={
+        "hook_event_name": "Stop",
+        "session_id": "sess-int",
+        "stop_hook_active": True,
+    })
+
+    resp = await client.get("/status")
+    data = await resp.json()
+    assert data["sess-int"]["interrupted"] is True
+    assert data["sess-int"]["status"] == "awaiting_input"
+
+
+@pytest.mark.asyncio
+async def test_customize_endpoint(client: TestClient) -> None:
+    """POST /session/{id}/customize stores custom ASCII for that session."""
+    # First create the session
+    await client.post("/event", json={
+        "hook_event_name": "SessionStart",
+        "session_id": "sess-custom",
+    })
+
+    # Set custom ASCII
+    resp = await client.post("/session/sess-custom/customize", json={
+        "frames": ["  o  \n /|\\ \n / \\", "  o  \n /|\\ \n/ \\"],
+        "label": "Dancing...",
+    })
+    assert resp.status == 200
+
+    # Now post an event — customizations should be merged
+    await client.post("/event", json={
+        "hook_event_name": "PreToolUse",
+        "session_id": "sess-custom",
+        "tool_name": "Bash",
+        "tool_input": {"command": "test"},
+    })
+
+    resp = await client.get("/status")
+    data = await resp.json()
+    assert data["sess-custom"]["custom_frames"] == ["  o  \n /|\\ \n / \\", "  o  \n /|\\ \n/ \\"]
+    assert data["sess-custom"]["custom_label"] == "Dancing..."
+
+
+@pytest.mark.asyncio
+async def test_custom_frames_in_event(client: TestClient) -> None:
+    """Custom frames sent directly in event payload are forwarded."""
+    await client.post("/event", json={
+        "hook_event_name": "PreToolUse",
+        "session_id": "sess-inline",
+        "tool_name": "Edit",
+        "tool_input": {"file_path": "/tmp/x.py"},
+        "custom_frames": ["frame_a", "frame_b"],
+        "custom_label": "Hacking...",
+    })
+
+    resp = await client.get("/status")
+    data = await resp.json()
+    assert data["sess-inline"]["custom_frames"] == ["frame_a", "frame_b"]
+    assert data["sess-inline"]["custom_label"] == "Hacking..."

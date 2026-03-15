@@ -2,6 +2,7 @@ package com.claudescreensaver.data
 
 import com.claudescreensaver.data.models.AgentState
 import com.claudescreensaver.data.models.AgentStatus
+import com.claudescreensaver.data.models.SubAgentInfo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -30,6 +31,10 @@ object DemoDataProvider {
             message = "",
             requiresInput = false,
             agentType = "gsd-executor",
+            subAgents = listOf(
+                SubAgentInfo("demo-agent-1", "Explore", "running"),
+                SubAgentInfo("demo-agent-2", "general-purpose", "running"),
+            ),
         ),
         AgentStatus(
             state = AgentState.AWAITING_INPUT,
@@ -40,6 +45,7 @@ object DemoDataProvider {
             toolInputSummary = "",
             message = "Claude is waiting for your input",
             requiresInput = true,
+            userMessage = "fix the login bug",
         ),
         AgentStatus(
             state = AgentState.TOOL_CALL,

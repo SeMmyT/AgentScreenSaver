@@ -13,9 +13,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -61,7 +63,7 @@ fun SessionCard(
         label = "pulse",
     )
 
-    val stateLabel = when (status.state) {
+    val stateLabel = status.customLabel ?: when (status.state) {
         AgentState.IDLE -> "idle"
         AgentState.THINKING -> "thinking..."
         AgentState.TOOL_CALL -> status.tool?.lowercase() ?: "working"
@@ -103,6 +105,15 @@ fun SessionCard(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
+            if (status.subAgents.isNotEmpty()) {
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = "${status.subAgents.size} agents",
+                    fontFamily = mono,
+                    fontSize = 9.sp,
+                    color = StatusStandby,
+                )
+            }
         }
 
         // Terminal content area
@@ -144,6 +155,32 @@ fun SessionCard(
                 Spacer(Modifier.height(4.dp))
             }
 
+            // User input (from UserPromptSubmit)
+            status.userMessage?.let { msg ->
+                Text(
+                    text = "you: $msg",
+                    fontFamily = mono,
+                    fontSize = 11.sp,
+                    color = ClaudeAccent,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(4.dp))
+            }
+
+            // Interrupted state
+            if (status.interrupted) {
+                Text(
+                    text = ">>> INTERRUPTED <<<",
+                    fontFamily = mono,
+                    fontSize = 13.sp,
+                    color = StatusWarning,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.alpha(pulseAlpha),
+                )
+                Spacer(Modifier.height(4.dp))
+            }
+
             // Message (thinking content, notification, etc.)
             if (status.message.isNotEmpty()) {
                 Text(
@@ -155,6 +192,19 @@ fun SessionCard(
                     overflow = TextOverflow.Ellipsis,
                     lineHeight = 14.sp,
                 )
+            }
+
+            // Sub-agent list
+            if (status.subAgents.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                status.subAgents.forEach { agent ->
+                    Text(
+                        text = "  ${if (agent.status == "running") ">" else "-"} ${agent.name.ifEmpty { agent.agentType }}",
+                        fontFamily = mono,
+                        fontSize = 9.sp,
+                        color = if (agent.status == "running") StatusRunning else StatusDisabled,
+                    )
+                }
             }
 
             Spacer(Modifier.weight(1f))

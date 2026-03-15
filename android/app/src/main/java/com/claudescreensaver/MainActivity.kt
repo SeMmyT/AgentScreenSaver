@@ -1,6 +1,11 @@
 package com.claudescreensaver
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
+import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -40,10 +45,22 @@ class MainActivity : ComponentActivity() {
     private lateinit var viewModel: StatusViewModel
     private lateinit var soundManager: SoundManager
     private lateinit var billingManager: BillingManager
+    private var powerReceiver: BroadcastReceiver? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        // Kiosk mode: show over lock screen, keep screen on, dismiss keyguard
+        window.addFlags(
+            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+            WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        }
 
         bridgeDiscovery = BridgeDiscovery(this)
         viewModel = StatusViewModel(SseClient())
@@ -58,6 +75,10 @@ class MainActivity : ComponentActivity() {
             viewModel.connect(savedUrl)
         }
 
+        // Auto-launch dashboard when charging if kiosk mode enabled
+        val kioskEnabled = prefs.getBoolean("kiosk_mode", false)
+        val isCharging = isDeviceCharging()
+
         setContent {
             ClaudeScreenSaverTheme {
                 val uiState by viewModel.uiState.collectAsState()
@@ -66,11 +87,29 @@ class MainActivity : ComponentActivity() {
                 val billingProducts by billingManager.products.collectAsState()
                 val scope = rememberCoroutineScope()
 
-                // Screen navigation: show onboarding on first launch (no saved URL)
-                val initialScreen = if (savedUrl.isBlank()) "onboarding" else "settings"
+                // Screen navigation
+                val initialScreen = when {
+                    kioskEnabled && isCharging && savedUrl.isNotBlank() -> "dashboard"
+                    savedUrl.isBlank() -> "onboarding"
+                    else -> "settings"
+                }
                 var currentScreen by remember { mutableStateOf(initialScreen) }
 
                 val isPro = proStatus == ProStatus.PRO || proStatus == ProStatus.TRIAL
+
+                // Display mode — reactive to settings changes
+                var displayMode by remember {
+                    mutableStateOf(prefs.getString("display_mode", "advanced") ?: "advanced")
+                }
+                DisposableEffect(Unit) {
+                    val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                        if (key == "display_mode") {
+                            displayMode = prefs.getString("display_mode", "advanced") ?: "advanced"
+                        }
+                    }
+                    prefs.registerOnSharedPreferenceChangeListener(listener)
+                    onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+                }
 
                 // Gate sounds: disabled when FREE
                 LaunchedEffect(isPro) {
@@ -120,6 +159,7 @@ class MainActivity : ComponentActivity() {
                             StatusDashboardScreen(
                                 uiState = demoUiState,
                                 isPro = true,
+                                displayMode = displayMode,
                                 modifier = Modifier.fillMaxSize(),
                             )
 
@@ -145,6 +185,7 @@ class MainActivity : ComponentActivity() {
                         StatusDashboardScreen(
                             uiState = uiState,
                             isPro = isPro,
+                            displayMode = displayMode,
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
@@ -204,10 +245,12 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         bridgeDiscovery.startDiscovery()
+        registerPowerReceiver()
     }
 
     override fun onPause() {
         bridgeDiscovery.stopDiscovery()
+        unregisterPowerReceiver()
         super.onPause()
     }
 
@@ -215,5 +258,40 @@ class MainActivity : ComponentActivity() {
         soundManager.release()
         billingManager.destroy()
         super.onDestroy()
+    }
+
+    private fun isDeviceCharging(): Boolean {
+        val intent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        return status == BatteryManager.BATTERY_STATUS_CHARGING ||
+               status == BatteryManager.BATTERY_STATUS_FULL
+    }
+
+    private fun registerPowerReceiver() {
+        if (powerReceiver != null) return
+        val prefs = getSharedPreferences("claude_screensaver", Context.MODE_PRIVATE)
+        powerReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action == Intent.ACTION_POWER_CONNECTED) {
+                    val kioskEnabled = prefs.getBoolean("kiosk_mode", false)
+                    if (kioskEnabled) {
+                        // Bring activity to front when charging starts
+                        val launchIntent = Intent(context, MainActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                                    Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        }
+                        startActivity(launchIntent)
+                    }
+                }
+            }
+        }
+        registerReceiver(powerReceiver, IntentFilter(Intent.ACTION_POWER_CONNECTED))
+    }
+
+    private fun unregisterPowerReceiver() {
+        powerReceiver?.let {
+            unregisterReceiver(it)
+            powerReceiver = null
+        }
     }
 }

@@ -16,9 +16,15 @@ class SubAgent:
     agent_id: str
     agent_type: str
     status: str  # "running" or "completed"
+    name: str = ""  # human-readable description from Agent tool call
 
     def to_dict(self) -> dict[str, Any]:
-        return {"agent_id": self.agent_id, "agent_type": self.agent_type, "status": self.status}
+        return {
+            "agent_id": self.agent_id,
+            "agent_type": self.agent_type,
+            "status": self.status,
+            "name": self.name,
+        }
 
 
 class AgentState(StrEnum):
@@ -42,6 +48,8 @@ class HookEvent:
     agent_type: str | None = None
     stop_hook_active: bool = False
     last_assistant_message: str | None = None
+    custom_frames: list[str] | None = None
+    custom_label: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> HookEvent:
@@ -56,6 +64,8 @@ class HookEvent:
             agent_type=data.get("agent_type"),
             stop_hook_active=data.get("stop_hook_active", False),
             last_assistant_message=data.get("last_assistant_message"),
+            custom_frames=data.get("custom_frames"),
+            custom_label=data.get("custom_label"),
         )
 
 
@@ -71,6 +81,10 @@ class StatusUpdate:
     requires_input: bool = False
     agent_id: str | None = None
     agent_type: str | None = None
+    user_message: str | None = None
+    interrupted: bool = False
+    custom_frames: list[str] | None = None
+    custom_label: str | None = None
     sub_agents: list[SubAgent] = field(default_factory=list)
     ts: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
@@ -85,6 +99,15 @@ class StatusUpdate:
         if len(message) > 200:
             message = message[:200]
 
+        # user_message only for UserPromptSubmit (non-empty)
+        user_message: str | None = None
+        if event.event_name == "UserPromptSubmit" and event.message:
+            user_message = event.message
+
+        interrupted = (
+            event.event_name == "Stop" and event.stop_hook_active is True
+        )
+
         return cls(
             status=status,
             session_id=event.session_id,
@@ -96,6 +119,10 @@ class StatusUpdate:
             requires_input=requires_input,
             agent_id=event.agent_id,
             agent_type=event.agent_type,
+            user_message=user_message,
+            interrupted=interrupted,
+            custom_frames=event.custom_frames,
+            custom_label=event.custom_label,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -117,8 +144,14 @@ def _derive_status(event: HookEvent) -> AgentState:
             return AgentState.THINKING
         case "PostToolUseFailure":
             return AgentState.ERROR
-        case "Stop" | "SessionEnd":
+        case "Stop":
+            if event.stop_hook_active:
+                return AgentState.AWAITING_INPUT
             return AgentState.COMPLETE
+        case "SessionEnd":
+            return AgentState.COMPLETE
+        case "UserPromptSubmit":
+            return AgentState.THINKING
         case "Notification":
             if event.notification_type in ("permission_prompt", "idle_prompt"):
                 return AgentState.AWAITING_INPUT

@@ -39,19 +39,51 @@ async def event_handler(request: web.Request) -> web.Response:
 
     hook_event = HookEvent.from_dict(raw)
 
-    # Track sub-agent lifecycle
-    active_agents: dict[str, SubAgent] = request.app["active_agents"]
+    # Capture agent descriptions from PreToolUse for Agent tool
+    pending_names: dict[str, list[str]] = request.app["pending_agent_names"]
+    if (hook_event.event_name == "PreToolUse"
+            and hook_event.tool_name == "Agent"
+            and hook_event.tool_input):
+        desc = (hook_event.tool_input.get("description")
+                or hook_event.tool_input.get("name")
+                or "")
+        if desc:
+            pending_names.setdefault(hook_event.session_id, []).append(desc)
+
+    # Track sub-agent lifecycle (per session)
+    all_agents: dict[str, dict[str, SubAgent]] = request.app["active_agents"]
+    session_agents = all_agents.setdefault(hook_event.session_id, {})
     if hook_event.event_name == "SubagentStart" and hook_event.agent_id:
-        active_agents[hook_event.agent_id] = SubAgent(
+        # Pop a pending name if available
+        name = ""
+        session_pending = pending_names.get(hook_event.session_id, [])
+        if session_pending:
+            name = session_pending.pop(0)
+        session_agents[hook_event.agent_id] = SubAgent(
             agent_id=hook_event.agent_id,
             agent_type=hook_event.agent_type or "unknown",
             status="running",
+            name=name,
         )
     elif hook_event.event_name == "SubagentStop" and hook_event.agent_id:
-        active_agents.pop(hook_event.agent_id, None)
+        session_agents.pop(hook_event.agent_id, None)
+
+    # Store custom ASCII if provided
+    customizations = request.app["session_customizations"]
+    if hook_event.custom_frames:
+        customizations.setdefault(hook_event.session_id, {})["frames"] = hook_event.custom_frames
+    if hook_event.custom_label:
+        customizations.setdefault(hook_event.session_id, {})["label"] = hook_event.custom_label
 
     update = StatusUpdate.from_event(hook_event, instance_name=request.app["instance_name"])
-    update.sub_agents = list(active_agents.values())
+    update.sub_agents = list(session_agents.values())
+
+    # Merge stored customizations
+    stored = customizations.get(hook_event.session_id, {})
+    if stored.get("frames") and not update.custom_frames:
+        update.custom_frames = stored["frames"]
+    if stored.get("label") and not update.custom_label:
+        update.custom_label = stored["label"]
 
     # Store by session_id
     request.app["sessions"][update.session_id] = update
@@ -113,6 +145,24 @@ async def status_handler(request: web.Request) -> web.Response:
     return web.json_response(data)
 
 
+async def customize_handler(request: web.Request) -> web.Response:
+    """POST /session/{session_id}/customize — set custom ASCII art for a session."""
+    session_id = request.match_info["session_id"]
+    try:
+        data = await request.json()
+    except (json.JSONDecodeError, Exception):
+        return web.json_response({"error": "invalid JSON"}, status=400)
+
+    customizations = request.app["session_customizations"]
+    customizations.setdefault(session_id, {})
+    if "frames" in data:
+        customizations[session_id]["frames"] = data["frames"]
+    if "label" in data:
+        customizations[session_id]["label"] = data["label"]
+
+    return web.json_response({"accepted": True, "session_id": session_id}, status=200)
+
+
 async def on_startup_mdns(app: web.Application) -> None:
     """Register mDNS service on startup (non-fatal if fails)."""
     try:
@@ -147,14 +197,17 @@ def create_app(
     app = web.Application()
     app["instance_name"] = instance_name
     app["sessions"] = {}  # dict[str, StatusUpdate]
-    app["active_agents"] = {}  # dict[str, SubAgent]
+    app["active_agents"] = {}  # dict[str, dict[str, SubAgent]]
     app["sse_clients"] = set()  # set[asyncio.Queue[str]]
+    app["session_customizations"] = {}  # dict[str, dict] — {session_id: {"frames": [...], "label": "..."}}
+    app["pending_agent_names"] = {}  # dict[str, list[str]] — descriptions from PreToolUse Agent calls
     app["port"] = port
 
     app.router.add_get("/health", health_handler)
     app.router.add_post("/event", event_handler)
     app.router.add_get("/events", sse_handler)
     app.router.add_get("/status", status_handler)
+    app.router.add_post("/session/{session_id}/customize", customize_handler)
 
     if enable_mdns:
         app.on_startup.append(on_startup_mdns)

@@ -32,8 +32,14 @@ import kotlin.math.roundToInt
 fun StatusDashboardScreen(
     uiState: UiState,
     isPro: Boolean = true,
+    displayMode: String = "advanced",
     modifier: Modifier = Modifier,
 ) {
+    if (displayMode == "simple") {
+        SimpleStatusScreen(uiState = uiState, isPro = isPro, modifier = modifier)
+        return
+    }
+
     // Burn-in prevention: Lissajous pixel shift
     val infiniteTransition = rememberInfiniteTransition(label = "pixelShift")
     val offsetX by infiniteTransition.animateFloat(
