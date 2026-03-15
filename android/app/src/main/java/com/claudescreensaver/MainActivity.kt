@@ -6,22 +6,32 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.claudescreensaver.data.BillingManager
+import com.claudescreensaver.data.DemoDataProvider
 import com.claudescreensaver.data.ProStatus
 import com.claudescreensaver.data.SoundManager
+import com.claudescreensaver.data.models.AgentState
+import com.claudescreensaver.data.models.AgentStatus
 import com.claudescreensaver.data.network.BridgeDiscovery
 import com.claudescreensaver.data.network.ConnectionState
 import com.claudescreensaver.data.network.SseClient
+import com.claudescreensaver.ui.screens.OnboardingScreen
 import com.claudescreensaver.ui.screens.PaywallScreen
 import com.claudescreensaver.ui.screens.SettingsScreen
 import com.claudescreensaver.ui.screens.StatusDashboardScreen
 import com.claudescreensaver.ui.theme.ClaudeAccent
+import com.claudescreensaver.ui.theme.ClaudeAccentDeep
 import com.claudescreensaver.ui.theme.ClaudeScreenSaverTheme
+import com.claudescreensaver.ui.theme.ClaudeTextLight
 import com.claudescreensaver.viewmodel.StatusViewModel
+import com.claudescreensaver.viewmodel.UiState
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -56,8 +66,9 @@ class MainActivity : ComponentActivity() {
                 val billingProducts by billingManager.products.collectAsState()
                 val scope = rememberCoroutineScope()
 
-                // Screen navigation state
-                var currentScreen by remember { mutableStateOf("settings") }
+                // Screen navigation: show onboarding on first launch (no saved URL)
+                val initialScreen = if (savedUrl.isBlank()) "onboarding" else "settings"
+                var currentScreen by remember { mutableStateOf(initialScreen) }
 
                 val isPro = proStatus == ProStatus.PRO || proStatus == ProStatus.TRIAL
 
@@ -85,6 +96,51 @@ class MainActivity : ComponentActivity() {
                 }
 
                 when (currentScreen) {
+                    "onboarding" -> {
+                        OnboardingScreen(
+                            onGetStarted = { currentScreen = "settings" },
+                            onTryDemo = { currentScreen = "demo" },
+                        )
+                    }
+                    "demo" -> {
+                        // Collect demo data as state
+                        val demoSessions by DemoDataProvider.demoFlow()
+                            .collectAsState(initial = emptyMap())
+
+                        // Build a synthetic UiState for the dashboard
+                        val primarySession = demoSessions.values.firstOrNull()
+                            ?: AgentStatus.DISCONNECTED
+                        val demoUiState = UiState(
+                            agentStatus = primarySession,
+                            sessions = demoSessions,
+                            connectionState = ConnectionState.CONNECTED,
+                        )
+
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            StatusDashboardScreen(
+                                uiState = demoUiState,
+                                isPro = true,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+
+                            // EXIT DEMO floating button
+                            SmallFloatingActionButton(
+                                onClick = { currentScreen = "onboarding" },
+                                containerColor = ClaudeAccentDeep,
+                                contentColor = ClaudeTextLight,
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(12.dp),
+                            ) {
+                                Text(
+                                    text = "EXIT DEMO",
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.padding(horizontal = 8.dp),
+                                )
+                            }
+                        }
+                    }
                     "dashboard" -> {
                         StatusDashboardScreen(
                             uiState = uiState,
