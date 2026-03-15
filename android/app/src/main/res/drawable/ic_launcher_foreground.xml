@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Clawd pixel crab - centered in 72dp safe zone (offset 18,18) -->
+    <!-- Each pixel = 4dp in a 12x11 grid, centered at (18+6, 18+6) = (24, 24) -->
+
+    <!-- Row 0: eye stalks -->
+    <path android:fillColor="#D97757" android:pathData="M36,24h4v4h-4zM60,24h4v4h-4z"/>
+    <!-- Row 1: eye bulbs -->
+    <path android:fillColor="#D97757" android:pathData="M32,28h12v4h-12zM56,28h12v4h-12z"/>
+    <!-- Row 2: eyes with pupils -->
+    <path android:fillColor="#D97757" android:pathData="M32,32h4v4h-4zM40,32h4v4h-4zM56,32h4v4h-4zM64,32h4v4h-4z"/>
+    <path android:fillColor="#141413" android:pathData="M36,32h4v4h-4zM60,32h4v4h-4z"/>
+    <!-- Row 3: claw tops -->
+    <path android:fillColor="#D97757" android:pathData="M24,36h4v4h-4zM28,36h4v4h-4zM68,36h4v4h-4zM72,36h4v4h-4z"/>
+    <!-- Row 4: full width claws + body -->
+    <path android:fillColor="#D97757" android:pathData="M24,40h48v4h-48z"/>
+    <!-- Row 5: body -->
+    <path android:fillColor="#D97757" android:pathData="M32,44h32v4h-32z"/>
+    <!-- Row 6: wide body -->
+    <path android:fillColor="#D97757" android:pathData="M28,48h40v4h-40z"/>
+    <!-- Row 7: body -->
+    <path android:fillColor="#D97757" android:pathData="M32,52h32v4h-32z"/>
+    <!-- Row 8: lower body -->
+    <path android:fillColor="#D97757" android:pathData="M36,56h24v4h-24z"/>
+    <!-- Row 9: legs -->
+    <path android:fillColor="#D97757" android:pathData="M32,60h8v4h-8zM44,60h8v4h-8zM56,60h8v4h-8z"/>
+    <!-- Row 10: leg tips -->
+    <path android:fillColor="#D97757" android:pathData="M28,64h4v4h-4zM40,64h4v4h-4zM56,64h4v4h-4zM68,64h4v4h-4z"/>
+</vector>
