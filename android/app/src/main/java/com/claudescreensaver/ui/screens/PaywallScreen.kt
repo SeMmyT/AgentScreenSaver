@@ -60,13 +60,13 @@ fun PaywallScreen(
 
         Spacer(Modifier.height(24.dp))
 
-        // Pro features list
+        // Pro features list — cosmetic only
         val features = listOf(
-            "4-pane session grid",
-            "Sound alerts on state changes",
-            "Screensaver / DreamService mode",
-            "Landscape orientation",
-            "Long-press pane reordering",
+            "Ghost skin marketplace",
+            "Animated mascot with state-reactive effects",
+            "Community skin packs — browse & share",
+            "Custom color palettes",
+            "Premium exclusive skins",
         )
         features.forEach { feature ->
             Row(

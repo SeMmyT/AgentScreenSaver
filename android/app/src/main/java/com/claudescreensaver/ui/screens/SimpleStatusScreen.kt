@@ -51,7 +51,7 @@ fun SimpleStatusScreen(
         label = "shiftY",
     )
 
-    val maxPanes = if (isPro) 4 else 1
+    val maxPanes = 4
     val activeSessions = uiState.sessions.values
         .sortedByDescending { it.timestamp }
         .take(maxPanes)
@@ -84,7 +84,7 @@ fun SimpleStatusScreen(
                 .padding(8.dp),
         ) {
             when {
-                orderedSessions.size >= 2 && isPro -> {
+                orderedSessions.size >= 2 -> {
                     // 2x2 grid of ASCII panes with reorder support
                     val rows = orderedSessions.chunked(2)
                     rows.forEachIndexed { rowIdx, row ->

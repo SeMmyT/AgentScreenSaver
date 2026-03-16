@@ -33,6 +33,7 @@ fun StatusDashboardScreen(
     uiState: UiState,
     isPro: Boolean = true,
     displayMode: String = "advanced",
+    onSessionTap: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     if (displayMode == "simple") {
@@ -61,7 +62,7 @@ fun StatusDashboardScreen(
         label = "shiftY",
     )
 
-    val maxPanes = if (isPro) 4 else 1
+    val maxPanes = 4
     val activeSessions = uiState.sessions.values
         .sortedByDescending { it.timestamp }
         .take(maxPanes)
@@ -170,6 +171,9 @@ fun StatusDashboardScreen(
                                                             slotOrder = newOrder
                                                         }
                                                         selectedSlot = -1
+                                                    } else if (selectedSlot < 0) {
+                                                        // Tap to focus — full-screen this session
+                                                        onSessionTap?.invoke(session.sessionId)
                                                     }
                                                 },
                                             )
@@ -199,14 +203,23 @@ fun StatusDashboardScreen(
                     }
                 }
                 orderedSessions.size == 1 -> {
-                    // Single session: full terminal pane
-                    SessionCard(
-                        status = orderedSessions.first(),
+                    // Single session: full terminal pane — tap to focus
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
-                            .padding(vertical = 2.dp),
-                    )
+                            .padding(vertical = 2.dp)
+                            .pointerInput(Unit) {
+                                detectTapGestures(
+                                    onTap = { onSessionTap?.invoke(orderedSessions.first().sessionId) }
+                                )
+                            },
+                    ) {
+                        SessionCard(
+                            status = orderedSessions.first(),
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
                 else -> {
                     // No sessions: centered status display

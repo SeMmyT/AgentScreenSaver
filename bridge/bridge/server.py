@@ -126,7 +126,10 @@ async def sse_handler(request: web.Request) -> web.StreamResponse:
             while True:
                 try:
                     payload = await asyncio.wait_for(queue.get(), timeout=30.0)
-                    await resp.send(payload, event="update")
+                    if payload.startswith("INPUT:"):
+                        await resp.send(payload[6:], event="input_pending")
+                    else:
+                        await resp.send(payload, event="update")
                 except asyncio.TimeoutError:
                     # Send keepalive comment
                     await resp.send("", event="keepalive")
@@ -143,6 +146,44 @@ async def status_handler(request: web.Request) -> web.Response:
     sessions: dict[str, StatusUpdate] = request.app["sessions"]
     data = {sid: s.to_dict() for sid, s in sessions.items()}
     return web.json_response(data)
+
+
+async def input_submit_handler(request: web.Request) -> web.Response:
+    """POST /session/{session_id}/input — queue user input from the phone."""
+    session_id = request.match_info["session_id"]
+    try:
+        data = await request.json()
+    except (json.JSONDecodeError, Exception):
+        return web.json_response({"error": "invalid JSON"}, status=400)
+
+    text = data.get("text", "").strip()
+    if not text:
+        return web.json_response({"error": "empty input"}, status=400)
+
+    pending: dict[str, list[str]] = request.app["pending_input"]
+    pending.setdefault(session_id, []).append(text)
+
+    # Broadcast input_pending event to SSE clients
+    notification = json.dumps({
+        "session_id": session_id,
+        "text": text,
+    })
+    for queue in request.app["sse_clients"]:
+        try:
+            queue.put_nowait(f"INPUT:{notification}")
+        except asyncio.QueueFull:
+            pass
+
+    logger.info("Input queued for session %s: %s", session_id[:8], text[:50])
+    return web.json_response({"accepted": True, "session_id": session_id}, status=202)
+
+
+async def input_poll_handler(request: web.Request) -> web.Response:
+    """GET /session/{session_id}/input — poll and consume pending input."""
+    session_id = request.match_info["session_id"]
+    pending: dict[str, list[str]] = request.app["pending_input"]
+    messages = pending.pop(session_id, [])
+    return web.json_response({"session_id": session_id, "messages": messages})
 
 
 async def customize_handler(request: web.Request) -> web.Response:
@@ -201,12 +242,15 @@ def create_app(
     app["sse_clients"] = set()  # set[asyncio.Queue[str]]
     app["session_customizations"] = {}  # dict[str, dict] — {session_id: {"frames": [...], "label": "..."}}
     app["pending_agent_names"] = {}  # dict[str, list[str]] — descriptions from PreToolUse Agent calls
+    app["pending_input"] = {}  # dict[str, list[str]] — user input from phone
     app["port"] = port
 
     app.router.add_get("/health", health_handler)
     app.router.add_post("/event", event_handler)
     app.router.add_get("/events", sse_handler)
     app.router.add_get("/status", status_handler)
+    app.router.add_post("/session/{session_id}/input", input_submit_handler)
+    app.router.add_get("/session/{session_id}/input", input_poll_handler)
     app.router.add_post("/session/{session_id}/customize", customize_handler)
 
     if enable_mdns:

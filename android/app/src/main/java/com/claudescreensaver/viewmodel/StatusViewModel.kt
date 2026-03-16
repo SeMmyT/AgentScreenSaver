@@ -42,6 +42,10 @@ class StatusViewModel(
         sseClient.disconnect()
     }
 
+    fun sendInput(sessionId: String, text: String) {
+        sseClient.sendInput(sessionId, text)
+    }
+
     override fun onCleared() {
         super.onCleared()
         sseClient.disconnect()

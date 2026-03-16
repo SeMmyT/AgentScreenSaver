@@ -10,8 +10,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONObject
+import java.io.OutputStreamWriter
+import java.net.HttpURLConnection
 import java.net.URI
+import java.net.URL
 import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 
 enum class ConnectionState {
     DISCONNECTED, CONNECTING, CONNECTED, ERROR
@@ -29,10 +33,14 @@ class SseClient {
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
     private var eventSource: BackgroundEventSource? = null
+    private var baseUrl: String = "" // e.g. "http://host:4001"
 
     fun connect(url: String) {
         disconnect()
         _connectionState.value = ConnectionState.CONNECTING
+
+        // Derive base URL from SSE URL (e.g. "http://host:4001/events" -> "http://host:4001")
+        baseUrl = url.removeSuffix("/events").removeSuffix("/")
 
         try {
             connectInternal(url)
@@ -100,6 +108,28 @@ class SseClient {
                 .retryDelay(2, TimeUnit.SECONDS)
         ).build()
         eventSource?.start()
+    }
+
+    fun sendInput(sessionId: String, text: String) {
+        if (baseUrl.isBlank()) return
+        thread {
+            try {
+                val url = URL("$baseUrl/session/$sessionId/input")
+                val conn = url.openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.doOutput = true
+                conn.connectTimeout = 5000
+                conn.readTimeout = 5000
+                OutputStreamWriter(conn.outputStream).use { writer ->
+                    writer.write("""{"text":"${text.replace("\"", "\\\"")}"}""")
+                }
+                conn.responseCode // trigger the request
+                conn.disconnect()
+            } catch (_: Exception) {
+                // Best-effort
+            }
+        }
     }
 
     fun disconnect() {
