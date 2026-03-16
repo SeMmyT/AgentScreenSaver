@@ -402,3 +402,47 @@ def test_custom_frames_passed_through():
     d = update.to_dict()
     assert d["custom_frames"] == ["frame1", "frame2", "frame3", "frame4"]
     assert d["custom_label"] == "Discombobulating..."
+
+
+def test_status_update_includes_metrics():
+    update = StatusUpdate(
+        status=AgentState.THINKING,
+        session_id="abc",
+        instance_name="test",
+        event="PreToolUse",
+    )
+    d = update.to_dict()
+    assert "metrics" in d
+    assert d["metrics"]["context_percent"] is None
+    assert d["metrics"]["cost_usd"] is None
+    assert d["metrics"]["model"] is None
+    assert d["metrics"]["cwd"] is None
+    assert d["metrics"]["lines_added"] is None
+    assert d["metrics"]["lines_removed"] is None
+
+
+def test_status_update_metrics_round_trip():
+    update = StatusUpdate(
+        status=AgentState.THINKING,
+        session_id="abc",
+        instance_name="test",
+        event="PreToolUse",
+        context_percent=45.2,
+        cost_usd=0.37,
+        model="Claude Opus 4.6",
+        cwd="/home/user/project",
+        lines_added=142,
+        lines_removed=38,
+        duration_ms=60000,
+        api_duration_ms=45000,
+    )
+    d = update.to_dict()
+    m = d["metrics"]
+    assert m["context_percent"] == 45.2
+    assert m["cost_usd"] == 0.37
+    assert m["model"] == "Claude Opus 4.6"
+    assert m["cwd"] == "/home/user/project"
+    assert m["lines_added"] == 142
+    assert m["lines_removed"] == 38
+    assert m["duration_ms"] == 60000
+    assert m["api_duration_ms"] == 45000

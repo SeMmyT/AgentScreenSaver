@@ -87,6 +87,15 @@ class StatusUpdate:
     custom_label: str | None = None
     sub_agents: list[SubAgent] = field(default_factory=list)
     ts: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    # Statusline metrics (populated via /session/{id}/metrics endpoint)
+    context_percent: float | None = None
+    cost_usd: float | None = None
+    model: str | None = None
+    cwd: str | None = None
+    lines_added: int | None = None
+    lines_removed: int | None = None
+    duration_ms: int | None = None
+    api_duration_ms: int | None = None
 
     @classmethod
     def from_event(cls, event: HookEvent, instance_name: str) -> StatusUpdate:
@@ -130,6 +139,20 @@ class StatusUpdate:
         d["v"] = 1
         d["status"] = str(self.status)
         d["sub_agents"] = [sa.to_dict() for sa in self.sub_agents]
+        # Nest metric fields under "metrics" key
+        d["metrics"] = {
+            "context_percent": self.context_percent,
+            "cost_usd": self.cost_usd,
+            "model": self.model,
+            "cwd": self.cwd,
+            "lines_added": self.lines_added,
+            "lines_removed": self.lines_removed,
+            "duration_ms": self.duration_ms,
+            "api_duration_ms": self.api_duration_ms,
+        }
+        for k in ("context_percent", "cost_usd", "model", "cwd",
+                   "lines_added", "lines_removed", "duration_ms", "api_duration_ms"):
+            d.pop(k, None)
         return d
 
     def to_json(self) -> str:
