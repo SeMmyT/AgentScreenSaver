@@ -209,23 +209,81 @@ fun SessionCard(
 
             Spacer(Modifier.weight(1f))
 
-            // Bottom status line
+            // Bottom status line — enhanced with metrics
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text(
-                    text = status.event.lowercase(),
-                    fontFamily = mono,
-                    fontSize = 9.sp,
-                    color = ClaudeGray.copy(alpha = 0.4f),
-                )
-                if (status.agentType != null) {
+                // Left: event + model
+                Row {
                     Text(
-                        text = status.agentType ?: "",
+                        text = status.event.lowercase(),
                         fontFamily = mono,
                         fontSize = 9.sp,
-                        color = ClaudeAccent.copy(alpha = 0.5f),
+                        color = ClaudeGray.copy(alpha = 0.4f),
+                    )
+                    status.model?.let { model ->
+                        Text(
+                            text = " · $model",
+                            fontFamily = mono,
+                            fontSize = 9.sp,
+                            color = ClaudeAccent.copy(alpha = 0.4f),
+                            maxLines = 1,
+                        )
+                    }
+                }
+
+                // Right: cost + churn + cwd
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    status.costUsd?.let { cost ->
+                        Text(
+                            text = "$${String.format("%.2f", cost)}",
+                            fontFamily = mono,
+                            fontSize = 9.sp,
+                            color = ClaudeGray.copy(alpha = 0.5f),
+                        )
+                    }
+                    if (status.linesAdded != null || status.linesRemoved != null) {
+                        Text(
+                            text = "+${status.linesAdded ?: 0}/-${status.linesRemoved ?: 0}",
+                            fontFamily = mono,
+                            fontSize = 9.sp,
+                            color = StatusRunning.copy(alpha = 0.5f),
+                        )
+                    }
+                    status.cwdShort?.let { dir ->
+                        Text(
+                            text = dir,
+                            fontFamily = mono,
+                            fontSize = 9.sp,
+                            color = ClaudeGray.copy(alpha = 0.3f),
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+
+            // Context bar — thin progress indicator at bottom of pane
+            status.contextPercent?.let { pct ->
+                Spacer(Modifier.height(4.dp))
+                val barColor = when {
+                    pct >= 90f -> StatusCritical
+                    pct >= 70f -> StatusWarning
+                    else -> StatusRunning
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(1.5.dp))
+                        .background(Color(0xFF2A2A2A)),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(fraction = (pct / 100f).coerceIn(0f, 1f))
+                            .clip(RoundedCornerShape(1.5.dp))
+                            .background(barColor),
                     )
                 }
             }

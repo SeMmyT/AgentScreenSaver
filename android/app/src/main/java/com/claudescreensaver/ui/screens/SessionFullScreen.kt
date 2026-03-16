@@ -164,6 +164,79 @@ fun SessionFullScreen(
                 )
             }
 
+            // Metrics bar — context, cost, model, churn
+            if (status.contextPercent != null || status.model != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF141414))
+                        .padding(horizontal = 10.dp, vertical = 3.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    // Model + CWD
+                    Row {
+                        status.model?.let { model ->
+                            Text(model, fontFamily = mono, fontSize = 10.sp, color = ClaudeAccent.copy(alpha = 0.7f))
+                        }
+                        status.cwdShort?.let { dir ->
+                            Text(" · $dir", fontFamily = mono, fontSize = 10.sp, color = ClaudeGray.copy(alpha = 0.5f))
+                        }
+                    }
+
+                    // Cost + churn + context%
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        status.costUsd?.let { cost ->
+                            Text(
+                                "$${String.format("%.2f", cost)}",
+                                fontFamily = mono, fontSize = 10.sp,
+                                color = ClaudeGray.copy(alpha = 0.6f),
+                            )
+                        }
+                        if (status.linesAdded != null || status.linesRemoved != null) {
+                            Text(
+                                "+${status.linesAdded ?: 0}/-${status.linesRemoved ?: 0}",
+                                fontFamily = mono, fontSize = 10.sp,
+                                color = StatusRunning.copy(alpha = 0.5f),
+                            )
+                        }
+                        status.contextPercent?.let { pct ->
+                            val ctxColor = when {
+                                pct >= 90f -> StatusCritical
+                                pct >= 70f -> StatusWarning
+                                else -> StatusRunning
+                            }
+                            Text(
+                                "${pct.toInt()}%",
+                                fontFamily = mono, fontSize = 10.sp,
+                                color = ctxColor,
+                            )
+                        }
+                    }
+                }
+
+                // Context progress bar
+                status.contextPercent?.let { pct ->
+                    val barColor = when {
+                        pct >= 90f -> StatusCritical
+                        pct >= 70f -> StatusWarning
+                        else -> StatusRunning
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(2.dp)
+                            .background(Color(0xFF2A2A2A)),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(fraction = (pct / 100f).coerceIn(0f, 1f))
+                                .background(barColor),
+                        )
+                    }
+                }
+            }
+
             // Scrollable content — maximize text display
             Column(
                 modifier = Modifier

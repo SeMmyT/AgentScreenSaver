@@ -40,10 +40,22 @@ data class AgentStatus(
     val subAgents: List<SubAgentInfo> = emptyList(),
     val customFrames: List<String>? = null,
     val customLabel: String? = null,
+    val contextPercent: Float? = null,
+    val costUsd: Float? = null,
+    val model: String? = null,
+    val cwd: String? = null,
+    val linesAdded: Int? = null,
+    val linesRemoved: Int? = null,
+    val durationMs: Long? = null,
+    val apiDurationMs: Long? = null,
 ) {
+    val cwdShort: String?
+        get() = cwd?.substringAfterLast('/')?.takeIf { it.isNotEmpty() }
+
     companion object {
         fun fromJson(json: String): AgentStatus {
             val obj = JSONObject(json)
+            val metricsObj = obj.optJSONObject("metrics")
             return AgentStatus(
                 state = AgentState.fromString(obj.optString("status", "thinking")),
                 sessionId = obj.optString("session_id", ""),
@@ -83,6 +95,14 @@ data class AgentStatus(
                     } else null
                 },
                 customLabel = obj.optString("custom_label").takeIf { it.isNotEmpty() && it != "null" },
+                contextPercent = metricsObj?.optDouble("context_percent")?.toFloat()?.takeIf { !it.isNaN() },
+                costUsd = metricsObj?.optDouble("cost_usd")?.toFloat()?.takeIf { !it.isNaN() },
+                model = metricsObj?.optString("model")?.takeIf { it.isNotEmpty() && it != "null" },
+                cwd = metricsObj?.optString("cwd")?.takeIf { it.isNotEmpty() && it != "null" },
+                linesAdded = metricsObj?.optInt("lines_added", -1)?.takeIf { it >= 0 },
+                linesRemoved = metricsObj?.optInt("lines_removed", -1)?.takeIf { it >= 0 },
+                durationMs = metricsObj?.optLong("duration_ms", -1)?.takeIf { it >= 0 },
+                apiDurationMs = metricsObj?.optLong("api_duration_ms", -1)?.takeIf { it >= 0 },
             )
         }
 

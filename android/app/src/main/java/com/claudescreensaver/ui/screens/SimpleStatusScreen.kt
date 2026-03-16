@@ -300,6 +300,34 @@ private fun SimpleAsciiPane(
                 )
             }
 
+            // Compact metrics line
+            val metrics = buildString {
+                status.model?.let { append(it.take(12)) }
+                status.contextPercent?.let {
+                    if (isNotEmpty()) append(" ")
+                    append("ctx:${it.toInt()}%")
+                }
+                status.costUsd?.let {
+                    if (isNotEmpty()) append(" ")
+                    append("$${String.format("%.2f", it)}")
+                }
+                if (status.linesAdded != null) {
+                    if (isNotEmpty()) append(" ")
+                    append("+${status.linesAdded}/-${status.linesRemoved ?: 0}")
+                }
+            }
+            if (metrics.isNotEmpty()) {
+                Text(
+                    text = metrics,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = if (compact) 8.sp else 10.sp,
+                    color = ClaudeGray.copy(alpha = 0.5f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(2.dp))
+            }
+
             if (!compact) {
                 // Sub-agent count (full mode only — no room in compact)
                 val agentCount = status.subAgents.size

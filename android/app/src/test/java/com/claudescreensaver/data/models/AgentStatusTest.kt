@@ -39,4 +39,118 @@ class AgentStatusTest {
         assertNull(d.tool)
         assertFalse(d.requiresInput)
     }
+
+    @Test
+    fun `fromJson parses metrics fields`() {
+        val json = """
+        {
+            "status": "thinking",
+            "session_id": "test123",
+            "instance_name": "dev",
+            "event": "PreToolUse",
+            "tool": "Bash",
+            "tool_input_summary": "ls",
+            "message": "",
+            "requires_input": false,
+            "ts": "2026-03-16T12:00:00Z",
+            "sub_agents": [],
+            "metrics": {
+                "context_percent": 42.5,
+                "cost_usd": 0.18,
+                "model": "Claude Opus 4.6",
+                "cwd": "/home/user/project",
+                "lines_added": 50,
+                "lines_removed": 10,
+                "duration_ms": 30000,
+                "api_duration_ms": 20000
+            }
+        }
+        """.trimIndent()
+
+        val status = AgentStatus.fromJson(json)
+        assertEquals(42.5f, status.contextPercent!!, 0.1f)
+        assertEquals(0.18f, status.costUsd!!, 0.01f)
+        assertEquals("Claude Opus 4.6", status.model)
+        assertEquals("/home/user/project", status.cwd)
+        assertEquals(50, status.linesAdded)
+        assertEquals(10, status.linesRemoved)
+        assertEquals(30000L, status.durationMs)
+        assertEquals(20000L, status.apiDurationMs)
+    }
+
+    @Test
+    fun `fromJson handles missing metrics gracefully`() {
+        val json = """
+        {
+            "status": "idle",
+            "session_id": "test456",
+            "instance_name": "dev",
+            "event": "Stop",
+            "tool_input_summary": "",
+            "message": "",
+            "requires_input": false,
+            "ts": "",
+            "sub_agents": []
+        }
+        """.trimIndent()
+
+        val status = AgentStatus.fromJson(json)
+        assertNull(status.contextPercent)
+        assertNull(status.costUsd)
+        assertNull(status.model)
+        assertNull(status.cwd)
+        assertNull(status.linesAdded)
+        assertNull(status.linesRemoved)
+        assertNull(status.durationMs)
+        assertNull(status.apiDurationMs)
+    }
+
+    @Test
+    fun `cwdShort returns last path component`() {
+        val json = """
+        {
+            "status": "thinking",
+            "session_id": "t",
+            "instance_name": "d",
+            "event": "e",
+            "tool_input_summary": "",
+            "message": "",
+            "requires_input": false,
+            "ts": "",
+            "sub_agents": [],
+            "metrics": {"cwd": "/home/user/my-project"}
+        }
+        """.trimIndent()
+
+        val status = AgentStatus.fromJson(json)
+        assertEquals("my-project", status.cwdShort)
+    }
+
+    @Test
+    fun `cwdShort is null when cwd is null`() {
+        val status = AgentStatus.DISCONNECTED
+        assertNull(status.cwdShort)
+    }
+
+    @Test
+    fun `cwdShort handles root path`() {
+        val json = """
+        {
+            "status": "thinking",
+            "session_id": "t",
+            "instance_name": "d",
+            "event": "e",
+            "tool_input_summary": "",
+            "message": "",
+            "requires_input": false,
+            "ts": "",
+            "sub_agents": [],
+            "metrics": {"cwd": "/"}
+        }
+        """.trimIndent()
+
+        val status = AgentStatus.fromJson(json)
+        // "/" substringAfterLast('/') is "" which is filtered by takeIf { isNotEmpty() }
+        assertNull(status.cwdShort)
+    }
 }
