@@ -22,7 +22,7 @@ data class UiState(
 )
 
 class StatusViewModel(
-    private val sseClient: SseClient = SseClient(),
+    val sseClient: SseClient = SseClient(),
     val skinEngine: SkinEngine = SkinEngine(),
 ) : ViewModel() {
 

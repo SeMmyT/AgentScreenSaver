@@ -9,6 +9,7 @@ import com.launchdarkly.eventsource.background.BackgroundEventSource
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
@@ -132,6 +133,71 @@ class SseClient {
         }
     }
 
+    fun fetchSkinList(callback: (List<SkinListItem>) -> Unit) {
+        if (baseUrl.isBlank()) return
+        thread {
+            try {
+                val url = URL("$baseUrl/skins")
+                val conn = url.openConnection() as HttpURLConnection
+                conn.connectTimeout = 5000
+                conn.readTimeout = 5000
+                val body = conn.inputStream.bufferedReader().readText()
+                conn.disconnect()
+                val arr = JSONArray(body)
+                val items = (0 until arr.length()).map { i ->
+                    val obj = arr.getJSONObject(i)
+                    SkinListItem(
+                        id = obj.getString("id"),
+                        name = obj.getString("name"),
+                        description = obj.optString("description", ""),
+                        author = obj.optString("author", "unknown"),
+                        isPremium = obj.optBoolean("is_premium", false),
+                    )
+                }
+                callback(items)
+            } catch (_: Exception) {
+                callback(emptyList())
+            }
+        }
+    }
+
+    fun fetchSkinJson(skinId: String, callback: (String?) -> Unit) {
+        if (baseUrl.isBlank()) return
+        thread {
+            try {
+                val url = URL("$baseUrl/skins/$skinId")
+                val conn = url.openConnection() as HttpURLConnection
+                conn.connectTimeout = 5000
+                conn.readTimeout = 5000
+                val body = conn.inputStream.bufferedReader().readText()
+                conn.disconnect()
+                callback(body)
+            } catch (_: Exception) {
+                callback(null)
+            }
+        }
+    }
+
+    fun uploadSkin(skinJson: String, callback: (Boolean) -> Unit) {
+        if (baseUrl.isBlank()) return
+        thread {
+            try {
+                val url = URL("$baseUrl/skins")
+                val conn = url.openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.doOutput = true
+                conn.connectTimeout = 5000
+                conn.readTimeout = 5000
+                OutputStreamWriter(conn.outputStream).use { it.write(skinJson) }
+                callback(conn.responseCode == 201)
+                conn.disconnect()
+            } catch (_: Exception) {
+                callback(false)
+            }
+        }
+    }
+
     fun disconnect() {
         eventSource?.close()
         eventSource = null
@@ -146,3 +212,11 @@ class SseClient {
         return sessions.values.sortedBy { priority.indexOf(it.state.value).let { i -> if (i < 0) 99 else i } }.first()
     }
 }
+
+data class SkinListItem(
+    val id: String,
+    val name: String,
+    val description: String,
+    val author: String,
+    val isPremium: Boolean,
+)

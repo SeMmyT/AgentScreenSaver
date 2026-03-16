@@ -27,10 +27,12 @@ import com.claudescreensaver.data.models.AgentStatus
 import com.claudescreensaver.data.network.BridgeDiscovery
 import com.claudescreensaver.data.network.ConnectionState
 import com.claudescreensaver.data.network.SseClient
+import com.claudescreensaver.data.network.SkinListItem
 import com.claudescreensaver.ui.screens.OnboardingScreen
 import com.claudescreensaver.ui.screens.PaywallScreen
 import com.claudescreensaver.ui.screens.SettingsScreen
 import com.claudescreensaver.ui.screens.SessionFullScreen
+import com.claudescreensaver.ui.screens.SkinMarketplaceScreen
 import com.claudescreensaver.ui.screens.StatusDashboardScreen
 import com.claudescreensaver.ui.theme.ClaudeAccent
 import com.claudescreensaver.ui.theme.ClaudeAccentDeep
@@ -97,6 +99,8 @@ class MainActivity : ComponentActivity() {
                 var currentScreen by remember { mutableStateOf(initialScreen) }
                 // Focused session for full-screen view (null = grid view)
                 var focusedSessionId by remember { mutableStateOf<String?>(null) }
+                // Marketplace: remote skin list from bridge
+                var remoteSkins by remember { mutableStateOf<List<SkinListItem>>(emptyList()) }
 
                 val isPro = proStatus == ProStatus.PRO || proStatus == ProStatus.TRIAL
 
@@ -234,9 +238,21 @@ class MainActivity : ComponentActivity() {
                                 billingManager.launchPurchase(this@MainActivity, product)
                             },
                             onContinueFree = {
-                                // Go to dashboard with limited features
                                 currentScreen = "dashboard"
                             },
+                        )
+                    }
+                    "skins" -> {
+                        SkinMarketplaceScreen(
+                            skinEngine = viewModel.skinEngine,
+                            remoteSkins = remoteSkins,
+                            activeSkinId = uiState.activeSkin.id,
+                            isPro = isPro,
+                            onFetchSkin = { skinId, callback ->
+                                viewModel.sseClient.fetchSkinJson(skinId, callback)
+                            },
+                            onBack = { currentScreen = "settings" },
+                            onUpgradeToPro = { currentScreen = "paywall" },
                         )
                     }
                     else -> {
@@ -249,16 +265,30 @@ class MainActivity : ComponentActivity() {
                                 onDisconnect = { viewModel.disconnect() },
                                 modifier = Modifier.weight(1f),
                             )
-                            Button(
-                                onClick = {
-                                    currentScreen = "dashboard"
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = ClaudeAccent),
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(24.dp),
+                                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
-                                Text("Preview ScreenSaver")
+                                Button(
+                                    onClick = {
+                                        // Fetch remote skins when navigating to marketplace
+                                        viewModel.sseClient.fetchSkinList { remoteSkins = it }
+                                        currentScreen = "skins"
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = ClaudeAccentDeep),
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Text("Skins")
+                                }
+                                Button(
+                                    onClick = { currentScreen = "dashboard" },
+                                    colors = ButtonDefaults.buttonColors(containerColor = ClaudeAccent),
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Text("Preview ScreenSaver")
+                                }
                             }
                         }
                     }
