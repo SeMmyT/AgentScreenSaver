@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.claudescreensaver.data.models.AgentState
 import com.claudescreensaver.data.models.AgentStatus
+import com.claudescreensaver.data.models.Skin
 import com.claudescreensaver.ui.theme.*
 import com.claudescreensaver.viewmodel.UiState
 import kotlinx.coroutines.delay
@@ -133,6 +134,7 @@ fun SimpleStatusScreen(
                                     SimpleAsciiPane(
                                         status = session,
                                         compact = true,
+                                        skin = uiState.activeSkin,
                                         modifier = Modifier.fillMaxSize(),
                                     )
                                     if (isSelected) {
@@ -158,6 +160,7 @@ fun SimpleStatusScreen(
                     SimpleAsciiPane(
                         status = orderedSessions.first(),
                         compact = false,
+                        skin = uiState.activeSkin,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -165,6 +168,7 @@ fun SimpleStatusScreen(
                     SimpleAsciiPane(
                         status = uiState.agentStatus,
                         compact = false,
+                        skin = uiState.activeSkin,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -181,9 +185,12 @@ fun SimpleStatusScreen(
 private fun SimpleAsciiPane(
     status: AgentStatus,
     compact: Boolean,
+    skin: Skin = Skin.DEFAULT,
     modifier: Modifier = Modifier,
 ) {
-    val frames = status.customFrames?.takeIf { it.isNotEmpty() } ?: asciiFramesFor(status.state)
+    val frames = status.customFrames?.takeIf { it.isNotEmpty() }
+        ?: skin.asciiFrames[status.state]
+        ?: listOf("?")
     var frameIndex by remember { mutableIntStateOf(0) }
     var tick by remember { mutableIntStateOf(0) }
 
@@ -343,198 +350,6 @@ private fun SimpleAsciiPane(
     }
 }
 
-private fun asciiFramesFor(state: AgentState): List<String> = when (state) {
-    AgentState.IDLE -> listOf(
-        "     .  *  .     \n" +
-        "   .    _    .   \n" +
-        "       |_|       \n" +
-        "    ___| |___    \n" +
-        "   |         |   \n" +
-        "   |_________|   ",
-
-        "   .    *    .   \n" +
-        "     .  _  .     \n" +
-        "       |_|       \n" +
-        "    ___| |___    \n" +
-        "   |         |   \n" +
-        "   |_________|   ",
-
-        "        *        \n" +
-        "   .    _    .   \n" +
-        "       |_|       \n" +
-        "    ___| |___    \n" +
-        "   |         |   \n" +
-        "   |_________|   ",
-
-        "     .  *  .     \n" +
-        "        _        \n" +
-        "       |_|       \n" +
-        "    ___| |___    \n" +
-        "   |         |   \n" +
-        "   |_________|   ",
-    )
-    AgentState.THINKING -> listOf(
-        "      ____       \n" +
-        "     / o  \\      \n" +
-        "    |  __  |  ?  \n" +
-        "     \\____/      \n" +
-        "     /|  |\\      \n" +
-        "    / |  | \\     ",
-
-        "      ____       \n" +
-        "     / o  \\      \n" +
-        "    |  __  | ??  \n" +
-        "     \\____/      \n" +
-        "     /|  |\\      \n" +
-        "    / |  | \\     ",
-
-        "      ____       \n" +
-        "     /  o \\      \n" +
-        "    |  __  |???  \n" +
-        "     \\____/      \n" +
-        "     /|  |\\      \n" +
-        "    / |  | \\     ",
-
-        "      ____       \n" +
-        "     / o  \\      \n" +
-        "    |  __  |  !  \n" +
-        "     \\____/      \n" +
-        "     /|  |\\      \n" +
-        "    / |  | \\     ",
-    )
-    AgentState.TOOL_CALL -> listOf(
-        "    _______      \n" +
-        "   |  > _  |     \n" +
-        "   |  |_|  |     \n" +
-        "   |  ___  |     \n" +
-        "   | |   | |     \n" +
-        "   |_|   |_|     \n" +
-        "      ___        \n" +
-        "     |   |       ",
-
-        "    _______      \n" +
-        "   |  > _  |     \n" +
-        "   |  |/|  |     \n" +
-        "   |  ___  |     \n" +
-        "   | |   | |     \n" +
-        "   |_|   |_|     \n" +
-        "      ___        \n" +
-        "     |___|       ",
-
-        "    _______      \n" +
-        "   |  > _  |     \n" +
-        "   |  |\\|  |     \n" +
-        "   |  ___  |     \n" +
-        "   | |   | |     \n" +
-        "   |_|   |_|     \n" +
-        "     _____       \n" +
-        "    |     |      ",
-
-        "    _______      \n" +
-        "   |  > _  |     \n" +
-        "   |  |_|  |     \n" +
-        "   |  ___  |     \n" +
-        "   | |   | |     \n" +
-        "   |_|   |_|     \n" +
-        "     _____       \n" +
-        "    |_____|      ",
-    )
-    AgentState.AWAITING_INPUT -> listOf(
-        "      /\\         \n" +
-        "     /  \\        \n" +
-        "    / !! \\       \n" +
-        "   /______\\      \n" +
-        "                  \n" +
-        "   [  YOUR  ]    \n" +
-        "   [  TURN  ]    ",
-
-        "      /\\         \n" +
-        "     /  \\        \n" +
-        "    / !! \\       \n" +
-        "   /______\\      \n" +
-        "      ||         \n" +
-        "   [  YOUR  ]    \n" +
-        "   [  TURN  ]    ",
-
-        "      /\\         \n" +
-        "     /  \\        \n" +
-        "    / !! \\       \n" +
-        "   /______\\      \n" +
-        "                  \n" +
-        "   [  YOUR  ]    \n" +
-        "   [  TURN  ]    ",
-
-        "      /\\         \n" +
-        "     /  \\        \n" +
-        "    / !! \\       \n" +
-        "   /______\\      \n" +
-        "      ||         \n" +
-        "   [  YOUR  ]    \n" +
-        "   [  TURN  ]    ",
-    )
-    AgentState.ERROR -> listOf(
-        "    _______      \n" +
-        "   |       |     \n" +
-        "   |  X  X |     \n" +
-        "   |   __  |     \n" +
-        "   |  /  \\ |     \n" +
-        "   |_______| !   ",
-
-        "    _______      \n" +
-        "   |       |     \n" +
-        "   |  x  x |     \n" +
-        "   |   __  |     \n" +
-        "   |  /  \\ |     \n" +
-        "   |_______| !!  ",
-
-        "    _______      \n" +
-        "   |       |     \n" +
-        "   |  X  X |     \n" +
-        "   |   __  |     \n" +
-        "   |  /  \\ |     \n" +
-        "   |_______| !!! ",
-
-        "    _______      \n" +
-        "   |       |     \n" +
-        "   |  x  x |     \n" +
-        "   |   __  |     \n" +
-        "   |  /  \\ |     \n" +
-        "   |_______| !   ",
-    )
-    AgentState.COMPLETE -> listOf(
-        "       __        \n" +
-        "      / /        \n" +
-        "     / /         \n" +
-        "    / /          \n" +
-        "   /_/    ___    \n" +
-        "         /   /   \n" +
-        "        /___/    ",
-
-        "       __        \n" +
-        "      / /        \n" +
-        "     / /         \n" +
-        "    / /  .       \n" +
-        "   /_/    ___    \n" +
-        "    .    /   /   \n" +
-        "        /___/    ",
-
-        "       __        \n" +
-        "      / /  .     \n" +
-        "     / /         \n" +
-        "    / /    .     \n" +
-        "   /_/    ___    \n" +
-        "         /   / . \n" +
-        "        /___/    ",
-
-        "       __   .    \n" +
-        "      / /        \n" +
-        "     / /  .      \n" +
-        "    / /          \n" +
-        "   /_/    ___  . \n" +
-        "     .   /   /   \n" +
-        "        /___/    ",
-    )
-}
 
 @Composable
 private fun stateColor(state: AgentState): Color = when (state) {
