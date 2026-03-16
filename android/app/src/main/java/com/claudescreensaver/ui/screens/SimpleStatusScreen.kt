@@ -536,6 +536,7 @@ private fun asciiFramesFor(state: AgentState): List<String> = when (state) {
     )
 }
 
+@Composable
 private fun stateColor(state: AgentState): Color = when (state) {
     AgentState.IDLE -> StatusDisabled
     AgentState.THINKING -> StatusStandby

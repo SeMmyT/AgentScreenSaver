@@ -81,7 +81,7 @@ class MainActivity : ComponentActivity() {
         val isCharging = isDeviceCharging()
 
         setContent {
-            ClaudeScreenSaverTheme {
+            ClaudeScreenSaverTheme(skin = viewModel.uiState.collectAsState().value.activeSkin) {
                 val uiState by viewModel.uiState.collectAsState()
                 val servers by bridgeDiscovery.servers.collectAsState()
                 val proStatus by billingManager.proStatus.collectAsState()

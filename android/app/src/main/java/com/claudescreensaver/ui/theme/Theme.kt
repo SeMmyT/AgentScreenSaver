@@ -3,24 +3,33 @@ package com.claudescreensaver.ui.theme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
-
-private val ClaudeDarkColorScheme = darkColorScheme(
-    primary = ClaudeAccent,
-    secondary = ClaudeAccentDeep,
-    background = ClaudeBgDark,
-    surface = ClaudeBgDark,
-    onPrimary = ClaudeTextLight,
-    onSecondary = ClaudeTextLight,
-    onBackground = ClaudeTextLight,
-    onSurface = ClaudeTextLight,
-    outline = ClaudeGray,
-)
+import androidx.compose.runtime.CompositionLocalProvider
+import com.claudescreensaver.data.models.Skin
 
 @Composable
-fun ClaudeScreenSaverTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = ClaudeDarkColorScheme,
-        typography = ClaudeTypography,
-        content = content,
+fun ClaudeScreenSaverTheme(
+    skin: Skin = Skin.DEFAULT,
+    content: @Composable () -> Unit,
+) {
+    val skinColors = SkinColors.from(skin.palette)
+
+    val colorScheme = darkColorScheme(
+        primary = skinColors.accent,
+        secondary = skinColors.accentDeep,
+        background = skinColors.background,
+        surface = skinColors.background,
+        onPrimary = skinColors.textPrimary,
+        onSecondary = skinColors.textPrimary,
+        onBackground = skinColors.textPrimary,
+        onSurface = skinColors.textPrimary,
+        outline = skinColors.textSecondary,
     )
+
+    CompositionLocalProvider(LocalSkinColors provides skinColors) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = ClaudeTypography,
+            content = content,
+        )
+    }
 }

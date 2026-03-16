@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.claudescreensaver.data.models.AgentState
 import com.claudescreensaver.data.models.AgentStatus
-import com.claudescreensaver.ui.components.ClawdMascot
+import com.claudescreensaver.ui.components.GhostMascot
 import com.claudescreensaver.ui.components.ConnectionBadge
 import com.claudescreensaver.ui.components.SessionCard
 import com.claudescreensaver.ui.components.StatusIndicator
@@ -110,8 +110,9 @@ fun StatusDashboardScreen(
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        ClawdMascot(
+                        GhostMascot(
                             state = uiState.agentStatus.state,
+                            skin = uiState.activeSkin,
                             modifier = Modifier.size(32.dp),
                         )
                         Spacer(Modifier.width(8.dp))

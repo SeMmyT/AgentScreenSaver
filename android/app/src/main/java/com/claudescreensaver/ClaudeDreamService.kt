@@ -31,7 +31,7 @@ class ClaudeDreamService : DreamServiceCompat() {
         val prefs = getSharedPreferences("claude_screensaver", Context.MODE_PRIVATE)
 
         setContent {
-            ClaudeScreenSaverTheme {
+            ClaudeScreenSaverTheme(skin = viewModel.uiState.collectAsState().value.activeSkin) {
                 val uiState by viewModel.uiState.collectAsState()
                 val displayMode = prefs.getString("display_mode", "advanced") ?: "advanced"
                 StatusDashboardScreen(

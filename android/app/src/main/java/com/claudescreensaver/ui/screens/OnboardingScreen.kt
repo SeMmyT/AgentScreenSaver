@@ -19,7 +19,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.claudescreensaver.data.models.AgentState
-import com.claudescreensaver.ui.components.ClawdMascot
+import com.claudescreensaver.data.models.Skin
+import com.claudescreensaver.ui.components.GhostMascot
 import com.claudescreensaver.ui.theme.*
 
 @Composable
@@ -50,9 +51,10 @@ fun OnboardingScreen(
     ) {
         Spacer(Modifier.weight(1f))
 
-        // Clawd mascot - large, centered, breathing
-        ClawdMascot(
+        // Ghost mascot - large, centered, breathing
+        GhostMascot(
             state = AgentState.IDLE,
+            skin = Skin.DEFAULT,
             modifier = Modifier
                 .size(120.dp)
                 .scale(breatheScale),
