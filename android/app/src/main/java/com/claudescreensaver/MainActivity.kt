@@ -194,6 +194,7 @@ class MainActivity : ComponentActivity() {
                                 onSendInput = { text ->
                                     viewModel.sendInput(focusedStatus.sessionId, text)
                                 },
+                                isPro = isPro,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         } else {

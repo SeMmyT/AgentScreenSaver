@@ -42,6 +42,7 @@ fun SessionFullScreen(
     status: AgentStatus,
     onBack: () -> Unit,
     onSendInput: (String) -> Unit,
+    isPro: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     var showInput by remember { mutableStateOf(false) }
@@ -52,9 +53,9 @@ fun SessionFullScreen(
     val termBg = Color(0xFF0D0D0D)
     val termBorder = Color(0xFF2A2A2A)
 
-    val canInput = status.state == AgentState.COMPLETE ||
+    val canInput = isPro && (status.state == AgentState.COMPLETE ||
             status.state == AgentState.AWAITING_INPUT ||
-            status.state == AgentState.IDLE
+            status.state == AgentState.IDLE)
 
     // Back handler: if input is showing, hide it; otherwise go back to grid
     BackHandler {

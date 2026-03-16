@@ -62,7 +62,7 @@ fun StatusDashboardScreen(
         label = "shiftY",
     )
 
-    val maxPanes = 4
+    val maxPanes = if (isPro) 4 else 1
     val activeSessions = uiState.sessions.values
         .sortedByDescending { it.timestamp }
         .take(maxPanes)
