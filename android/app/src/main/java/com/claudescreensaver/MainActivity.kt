@@ -9,7 +9,9 @@ import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -28,6 +30,7 @@ import com.claudescreensaver.data.network.BridgeDiscovery
 import com.claudescreensaver.data.network.ConnectionState
 import com.claudescreensaver.data.network.SseClient
 import com.claudescreensaver.data.network.SkinListItem
+import com.claudescreensaver.ui.screens.AdGateScreen
 import com.claudescreensaver.ui.screens.OnboardingScreen
 import com.claudescreensaver.ui.screens.PaywallScreen
 import com.claudescreensaver.ui.screens.SettingsScreen
@@ -67,6 +70,7 @@ class MainActivity : ComponentActivity() {
 
         bridgeDiscovery = BridgeDiscovery(this)
         viewModel = StatusViewModel(SseClient())
+        viewModel.skinEngine.loadBuiltInSkins(this)
         soundManager = SoundManager(this)
         billingManager = BillingManager(this)
         billingManager.initialize()
@@ -82,6 +86,8 @@ class MainActivity : ComponentActivity() {
         val kioskEnabled = prefs.getBoolean("kiosk_mode", false)
         val isCharging = isDeviceCharging()
 
+        enableEdgeToEdge()
+
         setContent {
             ClaudeScreenSaverTheme(skin = viewModel.uiState.collectAsState().value.activeSkin) {
                 val uiState by viewModel.uiState.collectAsState()
@@ -90,9 +96,14 @@ class MainActivity : ComponentActivity() {
                 val billingProducts by billingManager.products.collectAsState()
                 val scope = rememberCoroutineScope()
 
+                val isAdFree = proStatus == ProStatus.PRO || proStatus == ProStatus.TRIAL
+
                 // Screen navigation
+                // Kiosk auto-launch: ad-free users go straight to dashboard,
+                // free users see ad gate first
                 val initialScreen = when {
-                    kioskEnabled && isCharging && savedUrl.isNotBlank() -> "dashboard"
+                    kioskEnabled && isCharging && savedUrl.isNotBlank() && isAdFree -> "dashboard"
+                    kioskEnabled && isCharging && savedUrl.isNotBlank() -> "ad_gate"
                     savedUrl.isBlank() -> "onboarding"
                     else -> "settings"
                 }
@@ -102,7 +113,20 @@ class MainActivity : ComponentActivity() {
                 // Marketplace: remote skin list from bridge
                 var remoteSkins by remember { mutableStateOf<List<SkinListItem>>(emptyList()) }
 
-                val isPro = proStatus == ProStatus.PRO || proStatus == ProStatus.TRIAL
+                // Back navigation: go back through screens instead of closing app
+                BackHandler(enabled = currentScreen != "settings" && currentScreen != "onboarding") {
+                    when (currentScreen) {
+                        "dashboard" -> {
+                            if (focusedSessionId != null) {
+                                focusedSessionId = null
+                            } else {
+                                currentScreen = "settings"
+                            }
+                        }
+                        "skins", "paywall", "ad_gate", "demo" -> currentScreen = "settings"
+                        else -> currentScreen = "settings"
+                    }
+                }
 
                 // Display mode — reactive to settings changes
                 var displayMode by remember {
@@ -141,6 +165,11 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .systemBarsPadding(),
+                ) {
                 when (currentScreen) {
                     "onboarding" -> {
                         OnboardingScreen(
@@ -165,7 +194,6 @@ class MainActivity : ComponentActivity() {
                         Box(modifier = Modifier.fillMaxSize()) {
                             StatusDashboardScreen(
                                 uiState = demoUiState,
-                                isPro = true,
                                 displayMode = displayMode,
                                 modifier = Modifier.fillMaxSize(),
                             )
@@ -191,21 +219,18 @@ class MainActivity : ComponentActivity() {
                     "dashboard" -> {
                         val focusedStatus = focusedSessionId?.let { uiState.sessions[it] }
                         if (focusedStatus != null) {
-                            // Full-screen single session with input
                             SessionFullScreen(
                                 status = focusedStatus,
                                 onBack = { focusedSessionId = null },
                                 onSendInput = { text ->
                                     viewModel.sendInput(focusedStatus.sessionId, text)
                                 },
-                                isPro = isPro,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         } else {
                             Box(modifier = Modifier.fillMaxSize()) {
                                 StatusDashboardScreen(
                                     uiState = uiState,
-                                    isPro = isPro,
                                     displayMode = displayMode,
                                     onSessionTap = { sessionId -> focusedSessionId = sessionId },
                                     modifier = Modifier.fillMaxSize(),
@@ -229,6 +254,14 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+                    "ad_gate" -> {
+                        // Placeholder ad gate — free users see this before screensaver
+                        // TODO: Replace with actual AdMob interstitial
+                        AdGateScreen(
+                            onAdComplete = { currentScreen = "dashboard" },
+                            onUpgrade = { currentScreen = "paywall" },
+                        )
+                    }
                     "paywall" -> {
                         PaywallScreen(
                             proStatus = proStatus,
@@ -247,7 +280,6 @@ class MainActivity : ComponentActivity() {
                             skinEngine = viewModel.skinEngine,
                             remoteSkins = remoteSkins,
                             activeSkinId = uiState.activeSkin.id,
-                            isPro = isPro,
                             onFetchSkin = { skinId, callback ->
                                 viewModel.sseClient.fetchSkinJson(skinId, callback)
                             },
@@ -255,7 +287,6 @@ class MainActivity : ComponentActivity() {
                                 viewModel.sseClient.uploadSkin(json, callback)
                             },
                             onBack = { currentScreen = "settings" },
-                            onUpgradeToPro = { currentScreen = "paywall" },
                         )
                     }
                     else -> {
@@ -286,7 +317,14 @@ class MainActivity : ComponentActivity() {
                                     Text("Skins")
                                 }
                                 Button(
-                                    onClick = { currentScreen = "dashboard" },
+                                    onClick = {
+                                        if (isAdFree) {
+                                            currentScreen = "dashboard"
+                                        } else {
+                                            // Free users see ad before entering screensaver
+                                            currentScreen = "ad_gate"
+                                        }
+                                    },
                                     colors = ButtonDefaults.buttonColors(containerColor = ClaudeAccent),
                                     modifier = Modifier.weight(1f),
                                 ) {
@@ -296,6 +334,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+                } // Box with systemBarsPadding
 
                 // If user purchases from paywall, auto-navigate to dashboard
                 LaunchedEffect(proStatus) {

@@ -21,9 +21,11 @@ data class MascotAnimation(
 )
 
 data class MascotDef(
-    val grid: List<List<Int>>,   // 12x12, values index into colorMap (0=transparent)
+    val grid: List<List<Int>>,   // NxN base grid, values index into colorMap (0=transparent)
     val colorMap: Map<Int, Long>, // pixel value -> ARGB color
     val animation: MascotAnimation = MascotAnimation(),
+    /** Per-state animation frames. Each state maps to a list of grids (frame sequence). */
+    val stateFrames: Map<AgentState, List<List<List<Int>>>> = emptyMap(),
 )
 
 data class Skin(
@@ -45,19 +47,24 @@ data class Skin(
     fun validate(): List<String> {
         val errors = mutableListOf<String>()
 
-        // Grid must be 12x12
-        if (mascot.grid.size != 12) {
-            errors.add("Grid must have 12 rows, has ${mascot.grid.size}")
+        // Grid must be square (NxN)
+        val gridSize = mascot.grid.size
+        if (gridSize == 0) {
+            errors.add("Grid must not be empty")
         } else {
             mascot.grid.forEachIndexed { i, row ->
-                if (row.size != 12) {
-                    errors.add("Grid row $i must have 12 columns, has ${row.size}")
+                if (row.size != gridSize) {
+                    errors.add("Grid row $i must have $gridSize columns, has ${row.size}")
                 }
             }
         }
 
-        // All pixel values in grid must exist in colorMap
-        val allPixelValues = mascot.grid.flatten().toSet()
+        // All pixel values in grid (and state frames) must exist in colorMap
+        val allPixelValues = mascot.grid.flatten().toMutableSet()
+        mascot.stateFrames.values.forEach { frames ->
+            frames.forEach { frame -> allPixelValues.addAll(frame.flatten()) }
+        }
+        allPixelValues.remove(0) // 0 = transparent, not in colorMap
         val missingColors = allPixelValues - mascot.colorMap.keys
         if (missingColors.isNotEmpty()) {
             errors.add("Grid contains pixel values not in colorMap: $missingColors")
@@ -105,6 +112,23 @@ data class Skin(
         val colorMapObj = JSONObject()
         mascot.colorMap.forEach { (k, v) -> colorMapObj.put(k.toString(), v.toString()) }
         mascotObj.put("color_map", colorMapObj)
+        if (mascot.stateFrames.isNotEmpty()) {
+            val sfObj = JSONObject()
+            mascot.stateFrames.forEach { (state, frames) ->
+                val framesArr = JSONArray()
+                frames.forEach { frame ->
+                    val gridArr2 = JSONArray()
+                    frame.forEach { row ->
+                        val rowArr2 = JSONArray()
+                        row.forEach { rowArr2.put(it) }
+                        gridArr2.put(rowArr2)
+                    }
+                    framesArr.put(gridArr2)
+                }
+                sfObj.put(state.value, framesArr)
+            }
+            mascotObj.put("state_frames", sfObj)
+        }
         obj.put("mascot", mascotObj)
 
         // Palette — store as String to preserve Long precision
@@ -156,6 +180,23 @@ data class Skin(
                 it.toInt() to colorMapObj.getString(it).toLong()
             }
 
+            // Parse per-state frame grids (optional)
+            val stateFrames = mutableMapOf<AgentState, List<List<List<Int>>>>()
+            val framesGridObj = mascotObj.optJSONObject("state_frames")
+            if (framesGridObj != null) {
+                AgentState.entries.forEach { state ->
+                    val stateArr = framesGridObj.optJSONArray(state.value) ?: return@forEach
+                    val frames = (0 until stateArr.length()).map { fi ->
+                        val frameGrid = stateArr.getJSONArray(fi)
+                        (0 until frameGrid.length()).map { r ->
+                            val rowArr = frameGrid.getJSONArray(r)
+                            (0 until rowArr.length()).map { rowArr.getInt(it) }
+                        }
+                    }
+                    if (frames.isNotEmpty()) stateFrames[state] = frames
+                }
+            }
+
             val palObj = obj.getJSONObject("palette")
             val palette = SkinPalette(
                 accent = palObj.getString("accent").toLong(),
@@ -180,7 +221,7 @@ data class Skin(
                 schemaVersion = schema,
                 contentVersion = obj.optInt("content_version", 1),
                 isPremium = obj.optBoolean("is_premium", false),
-                mascot = MascotDef(grid = grid, colorMap = colorMap),
+                mascot = MascotDef(grid = grid, colorMap = colorMap, stateFrames = stateFrames),
                 palette = palette,
                 asciiFrames = asciiFrames,
             )

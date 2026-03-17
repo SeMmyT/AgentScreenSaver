@@ -1,5 +1,7 @@
 package com.claudescreensaver.data.skins
 
+import android.content.Context
+import android.util.Log
 import com.claudescreensaver.data.models.Skin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -12,6 +14,25 @@ class SkinEngine {
 
     private val _activeSkin = MutableStateFlow(Skin.DEFAULT)
     val activeSkin: StateFlow<Skin> = _activeSkin.asStateFlow()
+
+    /** Load built-in skins from assets/ directory. */
+    fun loadBuiltInSkins(context: Context) {
+        try {
+            val json = context.assets.open("dithered-ghost.json")
+                .bufferedReader().use { it.readText() }
+            val skin = Skin.fromJson(json)
+            val errors = skin.validate()
+            if (errors.isEmpty()) {
+                installSkin(skin)
+                setActiveSkin(skin.id)
+                Log.d("SkinEngine", "Loaded dithered-ghost skin (${skin.mascot.grid.size}x${skin.mascot.grid.size})")
+            } else {
+                Log.w("SkinEngine", "Dithered ghost skin validation failed: $errors")
+            }
+        } catch (e: Exception) {
+            Log.w("SkinEngine", "Failed to load dithered-ghost skin: ${e.message}")
+        }
+    }
 
     fun setActiveSkin(skinId: String) {
         val skin = _availableSkins.value.find { it.id == skinId } ?: return

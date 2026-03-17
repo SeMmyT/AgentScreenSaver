@@ -36,7 +36,6 @@ class ClaudeDreamService : DreamServiceCompat() {
                 val displayMode = prefs.getString("display_mode", "advanced") ?: "advanced"
                 StatusDashboardScreen(
                     uiState = uiState,
-                    isPro = true,
                     displayMode = displayMode,
                 )
             }

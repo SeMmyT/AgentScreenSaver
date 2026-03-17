@@ -36,7 +36,7 @@ fun PaywallScreen(
             .padding(24.dp),
     ) {
         Text(
-            text = "Agent ScreenSaver Pro",
+            text = "Go Ad-Free",
             style = MaterialTheme.typography.headlineMedium,
             color = ClaudeAccent,
             fontWeight = FontWeight.Bold,
@@ -46,13 +46,13 @@ fun PaywallScreen(
 
         if (proStatus == ProStatus.TRIAL) {
             Text(
-                text = "$trialDaysRemaining days left in trial",
+                text = "$trialDaysRemaining days of ad-free left",
                 style = MaterialTheme.typography.titleMedium,
                 color = StatusCaution,
             )
         } else {
             Text(
-                text = "Trial expired",
+                text = "Remove the ad when entering screensaver",
                 style = MaterialTheme.typography.titleMedium,
                 color = ClaudeGray,
             )
@@ -60,22 +60,20 @@ fun PaywallScreen(
 
         Spacer(Modifier.height(24.dp))
 
-        // Pro features
-        val features = listOf(
-            "4-pane session grid",
-            "Reply to sessions from your phone",
-            "Ghost skin marketplace",
-            "Community skin packs",
-            "Premium exclusive skins",
+        // Value prop
+        val benefits = listOf(
+            "No ads — instant screensaver entry",
+            "Support indie development",
+            "All future features included",
         )
-        features.forEach { feature ->
+        benefits.forEach { benefit ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 2.dp),
             ) {
                 Text("  +  ", color = StatusRunning, fontSize = 14.sp)
-                Text(feature, color = ClaudeTextLight, fontSize = 14.sp)
+                Text(benefit, color = ClaudeTextLight, fontSize = 14.sp)
             }
         }
 
@@ -149,12 +147,12 @@ fun PaywallScreen(
             }
         }
 
-        // If products haven't loaded yet (no Play Store connection), show fallback prices
+        // Fallback prices when Play Store not connected
         if (products.isEmpty()) {
             listOf(
                 Triple("Monthly", "$1.00/mo", false),
-                Triple("Annual", "$5.75/yr -- Save 52%", true),
-                Triple("Lifetime", "$9.85 -- Best value", false),
+                Triple("Annual", "$5.75/yr — Save 52%", true),
+                Triple("Lifetime", "$9.85 — Best value", false),
             ).forEach { (label, price, highlighted) ->
                 Box(
                     modifier = Modifier
@@ -179,7 +177,7 @@ fun PaywallScreen(
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "Purchase options will be available when connected to Play Store",
+                text = "Purchase options available when connected to Play Store",
                 color = ClaudeGray,
                 fontSize = 11.sp,
                 textAlign = TextAlign.Center,
@@ -188,9 +186,9 @@ fun PaywallScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // Continue with free tier
+        // Continue with ads
         TextButton(onClick = onContinueFree) {
-            Text("Continue with free tier", color = ClaudeGray)
+            Text("Continue with ads", color = ClaudeGray)
         }
     }
 }

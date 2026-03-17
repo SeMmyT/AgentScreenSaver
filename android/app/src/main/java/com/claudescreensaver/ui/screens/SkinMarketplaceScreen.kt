@@ -35,11 +35,9 @@ fun SkinMarketplaceScreen(
     skinEngine: SkinEngine,
     remoteSkins: List<SkinListItem>,
     activeSkinId: String,
-    isPro: Boolean,
     onFetchSkin: (String, (String?) -> Unit) -> Unit,
     onUploadSkin: (String, (Boolean) -> Unit) -> Unit,
     onBack: () -> Unit,
-    onUpgradeToPro: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val mono = FontFamily.Monospace
@@ -73,7 +71,7 @@ fun SkinMarketplaceScreen(
                 color = ClaudeAccent,
                 modifier = Modifier.weight(1f),
             )
-            if (isPro && activeSkinId != "ghost") {
+            if (activeSkinId != "ghost") {
                 var uploading by remember { mutableStateOf(false) }
                 val activeSkin = installedSkins.find { it.id == activeSkinId }
                 if (activeSkin != null) {
@@ -115,11 +113,9 @@ fun SkinMarketplaceScreen(
                 author = skin.author,
                 isActive = skin.id == activeSkinId,
                 isInstalled = true,
-                isPro = isPro,
                 previewSkin = skin,
                 onActivate = { skinEngine.setActiveSkin(skin.id) },
                 onInstall = {},
-                onUpgradeToPro = onUpgradeToPro,
             )
             Spacer(Modifier.height(8.dp))
         }
@@ -147,14 +143,9 @@ fun SkinMarketplaceScreen(
                         author = item.author,
                         isActive = false,
                         isInstalled = false,
-                        isPro = isPro,
                         previewSkin = null,
                         onActivate = {},
                         onInstall = {
-                            if (!isPro) {
-                                onUpgradeToPro()
-                                return@SkinCard
-                            }
                             installing = true
                             onFetchSkin(item.id) { json ->
                                 if (json != null) {
@@ -167,7 +158,6 @@ fun SkinMarketplaceScreen(
                                 installing = false
                             }
                         },
-                        onUpgradeToPro = onUpgradeToPro,
                         installing = installing,
                     )
                     Spacer(Modifier.height(8.dp))
@@ -195,11 +185,9 @@ private fun SkinCard(
     author: String,
     isActive: Boolean,
     isInstalled: Boolean,
-    isPro: Boolean,
     previewSkin: Skin?,
     onActivate: () -> Unit,
     onInstall: () -> Unit,
-    onUpgradeToPro: () -> Unit,
     installing: Boolean = false,
 ) {
     val mono = FontFamily.Monospace
@@ -287,16 +275,12 @@ private fun SkinCard(
             }
             else -> {
                 Button(
-                    onClick = {
-                        if (isPro) onInstall() else onUpgradeToPro()
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isPro) ClaudeAccent else ClaudeGray.copy(alpha = 0.3f),
-                    ),
+                    onClick = onInstall,
+                    colors = ButtonDefaults.buttonColors(containerColor = ClaudeAccent),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                 ) {
                     Text(
-                        text = if (isPro) "INSTALL" else "PRO",
+                        text = "INSTALL",
                         fontFamily = mono,
                         fontSize = 11.sp,
                     )
